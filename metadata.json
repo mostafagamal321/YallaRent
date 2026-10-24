@@ -1,0 +1,6 @@
+{
+  "name": "Rent Manager",
+  "description": "تطبيق إدارة الإيجارات والعقارات والوحدات السكنية والتجارية والعقود وحساب المتأخرات وإنشاء عقود الإيجار الرسمية PDF",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
