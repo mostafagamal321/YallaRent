@@ -25,6 +25,7 @@ export const SettingsScreen: React.FC = () => {
     setLanguage,
     exportBackup,
     importBackup,
+    clearAllRents,
   } = useApp();
 
   const isAr = language === 'ar';
@@ -545,6 +546,56 @@ export const SettingsScreen: React.FC = () => {
             />
           </label>
         </div>
+      </div>
+
+      {/* 6. Start with Empty Rents (تصفير العقود والأقساط) */}
+      <div
+        style={{
+          marginTop: '16px',
+          backgroundColor: '#ffffff',
+          borderRadius: '16px',
+          padding: '18px',
+          border: '1px solid #fee2e2',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <RotateCcw size={18} color="#dc2626" />
+          <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#dc2626', margin: 0 }}>
+            {isAr ? 'البدء بإيجارات فارغة (تصفير العقود)' : 'Start with Empty Rents (Reset Leases)'}
+          </h3>
+        </div>
+        <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+          {isAr
+            ? 'تفريغ وتصفير كافة العقود والأقساط المسجلة للبدء بسجل إيجارات جديد ونظيف، مع الاحتفاظ ببيانات العقارات والوحدات والمستأجرين.'
+            : 'Clear all contracts and payment records to start with empty rents, while preserving properties, units, and tenants.'}
+        </p>
+        <button
+          onClick={async () => {
+            if (
+              confirm(
+                isAr
+                  ? 'هل أنت متأكد من تصفير كافة العقود والأقساط والبدء بسجل إيجارات فارغ؟'
+                  : 'Are you sure you want to reset all contracts and start with empty rents?'
+              )
+            ) {
+              await clearAllRents();
+              alert(isAr ? 'تم تصفير الإيجارات بنجاح!' : 'Rents cleared successfully!');
+            }
+          }}
+          style={{
+            padding: '10px 16px',
+            borderRadius: '10px',
+            backgroundColor: '#fef2f2',
+            color: '#dc2626',
+            border: '1px solid #fca5a5',
+            fontSize: '12px',
+            fontWeight: 800,
+            cursor: 'pointer',
+          }}
+        >
+          {isAr ? 'تصفير سجل الإيجارات والعقود الآن' : 'Clear All Rents & Contracts Now'}
+        </button>
       </div>
     </div>
   );

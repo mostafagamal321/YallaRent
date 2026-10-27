@@ -101,6 +101,18 @@ object Formatters {
     }
   }
 
+  fun getRemainingDaysText(daysLeft: Int, language: String = "ar"): String {
+    val isAr = language == "ar"
+    return when {
+      daysLeft < 0 -> if (isAr) "منتهي منذ ${Math.abs(daysLeft)} يوم" else "Expired ${Math.abs(daysLeft)}d ago"
+      daysLeft == 0 -> if (isAr) "ينتهي اليوم" else "Expires today"
+      daysLeft == 1 -> if (isAr) "يوم واحد متبقي" else "1 day left"
+      daysLeft == 2 -> if (isAr) "يومان متبقيان" else "2 days left"
+      daysLeft in 3..10 -> if (isAr) "$daysLeft أيام متبقية" else "$daysLeft days left"
+      else -> if (isAr) "$daysLeft يوماً متبقياً" else "$daysLeft days left"
+    }
+  }
+
   fun calculateDurationText(startDateIso: String, endDateIso: String, language: String = "ar"): String {
     return try {
       val start = parseIsoDate(startDateIso)

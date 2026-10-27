@@ -15,11 +15,26 @@ export interface Unit {
   notes?: string; // previous/expected tenant or owner note
 }
 
+export interface Tenant {
+  id: string;
+  fullName: string;
+  nationalId: string; // 14 digits
+  job: string; // مهنة المستأجر
+  phone: string;
+  address: string;
+  nationality: string; // default "مصري"
+  photoPath?: string | null;
+  idCardPhotoFrontPath?: string | null;
+  idCardPhotoBackPath?: string | null;
+  notes?: string;
+}
+
 export type ContractStatus = 'active' | 'expiring_soon' | 'expired' | 'vacant';
 
 export interface Contract {
   id: string;
   unitId: string;
+  tenantId?: string; // Links to Tenant
   tenantName: string;
   nationalId: string; // 14 digits
   startDate: string; // YYYY-MM-DD
@@ -62,6 +77,14 @@ export interface Payment {
   paidDate?: string | null; // YYYY-MM-DD
   status: PaymentStatus;
   note?: string;
+
+  // Itemized breakdown
+  monthYear?: string;
+  rentAmount?: number;
+  electricityAmount?: number;
+  waterAmount?: number;
+  stairsCleaningAmount?: number;
+  previousArrearsAmount?: number;
 }
 
 export interface LandlordDetails {

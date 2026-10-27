@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp, NavigationTab } from '../context/AppContext';
-import { LayoutDashboard, Building2, ReceiptText, BellRing, Settings, LucideIcon } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, ReceiptText, BellRing, Settings, LucideIcon } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
   const { activeTab, setActiveTab, language, notifications } = useApp();
@@ -8,6 +8,7 @@ export const BottomNav: React.FC = () => {
   const tabs: { id: NavigationTab; labelAr: string; labelEn: string; icon: LucideIcon }[] = [
     { id: 'dashboard', labelAr: 'الرئيسية', labelEn: 'Dashboard', icon: LayoutDashboard },
     { id: 'properties', labelAr: 'العقارات', labelEn: 'Properties', icon: Building2 },
+    { id: 'tenants', labelAr: 'المستأجرون', labelEn: 'Tenants', icon: Users },
     { id: 'payments', labelAr: 'التحصيل', labelEn: 'Payments', icon: ReceiptText },
     { id: 'notifications', labelAr: 'التنبيهات', labelEn: 'Alerts', icon: BellRing },
     { id: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', icon: Settings },

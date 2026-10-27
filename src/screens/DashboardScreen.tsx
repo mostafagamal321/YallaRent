@@ -35,6 +35,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     contracts,
     properties,
     units,
+    tenants,
+    addTenant,
+    setSelectedTenantId,
     setActiveTab,
     setSelectedPropertyId,
   } = useApp();
@@ -313,6 +316,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               const unit = unitMap.get(p.unitId);
               const prop = unit ? propertyMap.get(unit.propertyId) : undefined;
               const daysLeft = getDaysFromToday(p.dueDate);
+              const linkedTenant = contract
+                ? (contract.tenantId
+                    ? tenants.find((t) => t.id === contract.tenantId)
+                    : tenants.find((t) => t.fullName.trim() === contract.tenantName.trim()))
+                : undefined;
 
               return (
                 <div
@@ -332,8 +340,33 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 >
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
-                        {contract?.tenantName || (isAr ? 'مستأجر' : 'Tenant')}
+                      <span
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (linkedTenant) {
+                            setSelectedTenantId(linkedTenant.id);
+                          } else if (contract?.tenantName) {
+                            const created = await addTenant({
+                              fullName: contract.tenantName,
+                              nationalId: contract.nationalId || '',
+                              job: contract.tenantJob || 'موظف',
+                              phone: '',
+                              address: contract.tenantAddress || 'الفيوم',
+                              nationality: contract.tenantNationality || 'مصري',
+                            });
+                            setSelectedTenantId(created.id);
+                          }
+                        }}
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 800,
+                          color: '#0f172a',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                        }}
+                        title={isAr ? 'عرض ملف المستأجر' : 'View Profile'}
+                      >
+                        {linkedTenant?.fullName || contract?.tenantName || (isAr ? 'مستأجر' : 'Tenant')}
                       </span>
                       <span
                         style={{
@@ -419,6 +452,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               const unit = unitMap.get(p.unitId);
               const prop = unit ? propertyMap.get(unit.propertyId) : undefined;
               const daysLate = Math.abs(getDaysFromToday(p.dueDate));
+              const linkedTenant = contract
+                ? (contract.tenantId
+                    ? tenants.find((t) => t.id === contract.tenantId)
+                    : tenants.find((t) => t.fullName.trim() === contract.tenantName.trim()))
+                : undefined;
 
               return (
                 <div
@@ -438,8 +476,33 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 >
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '15px', fontWeight: 800, color: '#991b1b' }}>
-                        {contract?.tenantName || (isAr ? 'مستأجر' : 'Tenant')}
+                      <span
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (linkedTenant) {
+                            setSelectedTenantId(linkedTenant.id);
+                          } else if (contract?.tenantName) {
+                            const created = await addTenant({
+                              fullName: contract.tenantName,
+                              nationalId: contract.nationalId || '',
+                              job: contract.tenantJob || 'موظف',
+                              phone: '',
+                              address: contract.tenantAddress || 'الفيوم',
+                              nationality: contract.tenantNationality || 'مصري',
+                            });
+                            setSelectedTenantId(created.id);
+                          }
+                        }}
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 800,
+                          color: '#991b1b',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                        }}
+                        title={isAr ? 'عرض ملف المستأجر' : 'View Profile'}
+                      >
+                        {linkedTenant?.fullName || contract?.tenantName || (isAr ? 'مستأجر' : 'Tenant')}
                       </span>
                       <span
                         style={{
@@ -512,6 +575,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               const unit = unitMap.get(c.unitId);
               const prop = unit ? propertyMap.get(unit.propertyId) : undefined;
               const daysLeft = getDaysFromToday(c.endDate);
+              const linkedTenant = c.tenantId
+                ? tenants.find((t) => t.id === c.tenantId)
+                : tenants.find((t) => t.fullName.trim() === c.tenantName.trim());
 
               return (
                 <div
@@ -531,8 +597,33 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 >
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '15px', fontWeight: 800, color: '#0369a1' }}>
-                        {c.tenantName}
+                      <span
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (linkedTenant) {
+                            setSelectedTenantId(linkedTenant.id);
+                          } else if (c.tenantName) {
+                            const created = await addTenant({
+                              fullName: c.tenantName,
+                              nationalId: c.nationalId || '',
+                              job: c.tenantJob || 'موظف',
+                              phone: '',
+                              address: c.tenantAddress || 'الفيوم',
+                              nationality: c.tenantNationality || 'مصري',
+                            });
+                            setSelectedTenantId(created.id);
+                          }
+                        }}
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: 800,
+                          color: '#0369a1',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                        }}
+                        title={isAr ? 'عرض ملف المستأجر' : 'View Profile'}
+                      >
+                        {linkedTenant?.fullName || c.tenantName}
                       </span>
                       <span
                         style={{

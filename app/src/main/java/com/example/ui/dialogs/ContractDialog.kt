@@ -62,6 +62,8 @@ import com.example.data.model.UnitItem
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.GreenDark
 import com.example.ui.theme.GreenLight
+import com.example.ui.theme.MintLight
+import androidx.compose.ui.text.font.FontWeight
 import com.example.util.Formatters
 import com.example.util.PdfContractGenerator
 

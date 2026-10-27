@@ -1,16 +1,17 @@
 import { Preferences } from '@capacitor/preferences';
 import { Share } from '@capacitor/share';
-import { Property, Unit, Contract, Payment, AppSettings } from '../types';
-import { INITIAL_PROPERTIES, INITIAL_UNITS, INITIAL_CONTRACTS, generateInitialPayments } from '../data/seedData';
+import { Property, Unit, Contract, Payment, AppSettings, Tenant } from '../types';
+import { INITIAL_PROPERTIES, INITIAL_UNITS } from '../data/seedData';
 import { DEFAULT_LANDLORD_DETAILS, DEFAULT_APARTMENT_TEMPLATE, DEFAULT_SHOPS_TEMPLATE } from '../data/defaultTemplates';
 
 const KEYS = {
   PROPERTIES: 'rent_properties_v1',
   UNITS: 'rent_units_v1',
+  TENANTS: 'rent_tenants_v1',
   CONTRACTS: 'rent_contracts_v1',
   PAYMENTS: 'rent_payments_v1',
   SETTINGS: 'rent_settings_v1',
-  INITIALIZED: 'rent_is_initialized_v1',
+  INITIALIZED: 'rent_is_initialized_v2', // bumped to v2 for empty rents & tenant migration
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -71,6 +72,7 @@ export interface AppDataBundle {
   exportedAt: string;
   properties: Property[];
   units: Unit[];
+  tenants: Tenant[];
   contracts: Contract[];
   payments: Payment[];
   settings: AppSettings;
@@ -80,45 +82,84 @@ export async function loadInitialAppData(): Promise<AppDataBundle> {
   const { value: isInit } = await Preferences.get({ key: KEYS.INITIALIZED });
   
   if (!isInit) {
-    // Seed data on first launch
+    // Seed initial properties & units, but start with empty rents as requested!
     const properties = INITIAL_PROPERTIES;
     const units = INITIAL_UNITS;
-    const contracts = INITIAL_CONTRACTS;
-    const payments = generateInitialPayments();
+    const tenants: Tenant[] = [];
+    const contracts: Contract[] = [];
+    const payments: Payment[] = [];
     const settings = DEFAULT_SETTINGS;
 
     await setStorageItem(KEYS.PROPERTIES, properties);
     await setStorageItem(KEYS.UNITS, units);
+    await setStorageItem(KEYS.TENANTS, tenants);
     await setStorageItem(KEYS.CONTRACTS, contracts);
     await setStorageItem(KEYS.PAYMENTS, payments);
     await setStorageItem(KEYS.SETTINGS, settings);
     await Preferences.set({ key: KEYS.INITIALIZED, value: 'true' });
 
     return {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       properties,
       units,
+      tenants,
       contracts,
       payments,
       settings,
     };
   }
 
-  const [properties, units, contracts, payments, settings] = await Promise.all([
+  const [properties, units, loadedTenants, loadedContracts, payments, settings] = await Promise.all([
     getStorageItem<Property[]>(KEYS.PROPERTIES, INITIAL_PROPERTIES),
     getStorageItem<Unit[]>(KEYS.UNITS, INITIAL_UNITS),
-    getStorageItem<Contract[]>(KEYS.CONTRACTS, INITIAL_CONTRACTS),
+    getStorageItem<Tenant[]>(KEYS.TENANTS, []),
+    getStorageItem<Contract[]>(KEYS.CONTRACTS, []),
     getStorageItem<Payment[]>(KEYS.PAYMENTS, []),
     getStorageItem<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS),
   ]);
 
+  // Migrate existing contracts to Tenant entities if needed
+  let tenants = [...loadedTenants];
+  const tenantMapByName = new Map<string, Tenant>();
+  tenants.forEach((t) => tenantMapByName.set(t.fullName.trim(), t));
+
+  let contractsUpdated = false;
+  const migratedContracts = loadedContracts.map((c) => {
+    if (c.tenantName && !c.tenantId) {
+      let existing = tenantMapByName.get(c.tenantName.trim());
+      if (!existing) {
+        existing = {
+          id: `tnt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          fullName: c.tenantName.trim(),
+          nationalId: c.nationalId || '',
+          job: c.tenantJob || 'موظف',
+          phone: '',
+          address: c.tenantAddress || 'الفيوم',
+          nationality: c.tenantNationality || 'مصري',
+          notes: c.notes,
+        };
+        tenants.push(existing);
+        tenantMapByName.set(existing.fullName.trim(), existing);
+      }
+      contractsUpdated = true;
+      return { ...c, tenantId: existing.id };
+    }
+    return c;
+  });
+
+  if (contractsUpdated || tenants.length !== loadedTenants.length) {
+    await setStorageItem(KEYS.TENANTS, tenants);
+    await setStorageItem(KEYS.CONTRACTS, migratedContracts);
+  }
+
   return {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     properties,
     units,
-    contracts,
+    tenants,
+    contracts: migratedContracts,
     payments,
     settings,
   };
@@ -129,11 +170,13 @@ export async function saveAppData(
   units: Unit[],
   contracts: Contract[],
   payments: Payment[],
-  settings: AppSettings
+  settings: AppSettings,
+  tenants: Tenant[] = []
 ): Promise<void> {
   await Promise.all([
     setStorageItem(KEYS.PROPERTIES, properties),
     setStorageItem(KEYS.UNITS, units),
+    setStorageItem(KEYS.TENANTS, tenants),
     setStorageItem(KEYS.CONTRACTS, contracts),
     setStorageItem(KEYS.PAYMENTS, payments),
     setStorageItem(KEYS.SETTINGS, settings),

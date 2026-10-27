@@ -4,6 +4,7 @@ import { Contract, Unit, Property } from '../types';
 import { toISODate, formatUIDate, calculateDurationText, parseDate } from '../utils/date';
 import { formatCurrency, toArabicIndicDigits } from '../utils/number';
 import { generateAndShareContractPDF } from '../services/pdfGenerator';
+import { TenantModal } from './TenantModal';
 import {
   FileText,
   Share2,
@@ -18,6 +19,7 @@ import {
   Trash2,
   ChevronRight,
   ChevronLeft,
+  Plus,
 } from 'lucide-react';
 
 interface ContractModalProps {
@@ -35,6 +37,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     properties,
     units,
     contracts,
+    tenants,
     settings,
     language,
     createContract,
@@ -60,6 +63,10 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   const [currentStep, setCurrentStep] = useState<'form' | 'review'>('form');
   const [isRenewing, setIsRenewing] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  // Tenant selection & modal
+  const [selectedTenantId, setSelectedTenantId] = useState<string | undefined>(existingContract?.tenantId);
+  const [showAddTenantModal, setShowAddTenantModal] = useState(false);
 
   // Form Fields
   const [tenantName, setTenantName] = useState('');
@@ -141,6 +148,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   const handleCommitContract = async () => {
     const payload = {
       unitId: selectedUnitId,
+      tenantId: selectedTenantId || undefined,
       tenantName: tenantName.trim(),
       nationalId: nationalId.trim(),
       startDate,
@@ -184,6 +192,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     const dummyContract: Contract = {
       id: existingContract ? existingContract.id : 'preview-cnt',
       unitId: selectedUnitId,
+      tenantId: selectedTenantId || undefined,
       tenantName: tenantName.trim(),
       nationalId: nationalId.trim(),
       startDate,
@@ -208,6 +217,8 @@ export const ContractModal: React.FC<ContractModalProps> = ({
       extraClause: extraClause.trim(),
     };
 
+    const linkedTenant = selectedTenantId ? tenants.find((t) => t.id === selectedTenantId) : undefined;
+
     try {
       await generateAndShareContractPDF({
         contract: dummyContract,
@@ -215,6 +226,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
         property: currentProperty,
         landlord: settings.landlord,
         templateText: activeTemplate,
+        tenant: linkedTenant,
       });
     } catch (e) {
       console.error(e);
@@ -354,6 +366,67 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 </h4>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Select Existing Tenant or Add New Tenant */}
+                  <div style={{ backgroundColor: '#ffffff', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #1b4332' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 800, color: '#1b4332' }}>
+                        {isAr ? '👤 اختيار مستأجر مسجل' : '👤 Select Registered Tenant'}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddTenantModal(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#0284c7',
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Plus size={13} />
+                        <span>{isAr ? '+ إضافة مستأجر جديد' : '+ Add New Tenant'}</span>
+                      </button>
+                    </div>
+                    <select
+                      value={selectedTenantId || ''}
+                      onChange={(e) => {
+                        const tId = e.target.value;
+                        setSelectedTenantId(tId || undefined);
+                        const chosen = tenants.find((t) => t.id === tId);
+                        if (chosen) {
+                          setTenantName(chosen.fullName);
+                          setNationalId(chosen.nationalId || '');
+                          setTenantJob(chosen.job || 'موظف');
+                          setTenantAddress(chosen.address || 'الفيوم');
+                          setTenantNationality(chosen.nationality || 'مصري');
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        height: '40px',
+                        padding: '0 10px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        backgroundColor: '#f8fafc',
+                      }}
+                    >
+                      <option value="">
+                        {isAr ? '-- اختر مستأجر من القائمة (أو اكتب بالأسفل) --' : '-- Choose tenant (or type below) --'}
+                      </option>
+                      {tenants.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.fullName} {t.phone ? `(${t.phone})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
                       {isAr ? 'اسم المستأجر بالكامل' : 'Tenant Full Name'} *
@@ -848,6 +921,21 @@ export const ContractModal: React.FC<ContractModalProps> = ({
           )}
         </div>
       </div>
+
+      {showAddTenantModal && (
+        <TenantModal
+          onClose={() => setShowAddTenantModal(false)}
+          onSuccess={(newTenant) => {
+            setSelectedTenantId(newTenant.id);
+            setTenantName(newTenant.fullName);
+            setNationalId(newTenant.nationalId || '');
+            setTenantJob(newTenant.job || 'موظف');
+            setTenantAddress(newTenant.address || 'الفيوم');
+            setTenantNationality(newTenant.nationality || 'مصري');
+            setShowAddTenantModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };

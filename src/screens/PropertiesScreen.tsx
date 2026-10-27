@@ -32,6 +32,9 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
     properties,
     units,
     contracts,
+    tenants,
+    addTenant,
+    setSelectedTenantId,
     language,
     searchQuery,
     selectedPropertyId,
@@ -452,6 +455,11 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                       {prop.matchedUnits.map((unit) => {
                         const contract = activeContractsByUnitId.get(unit.id);
                         const statusInfo = getUnitStatusInfo(unit);
+                        const linkedTenant = contract
+                          ? (contract.tenantId
+                              ? tenants.find((t) => t.id === contract.tenantId)
+                              : tenants.find((t) => t.fullName.trim() === contract.tenantName.trim()))
+                          : undefined;
 
                         return (
                           <div
@@ -497,12 +505,65 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                               </div>
 
                               {contract ? (
-                                <div>
-                                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#1b4332' }}>
-                                    {contract.tenantName}
+                                <div
+                                  style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px', cursor: 'pointer' }}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (linkedTenant) {
+                                      setSelectedTenantId(linkedTenant.id);
+                                    } else if (contract.tenantName) {
+                                      const created = await addTenant({
+                                        fullName: contract.tenantName,
+                                        nationalId: contract.nationalId || '',
+                                        job: contract.tenantJob || 'موظف',
+                                        phone: '',
+                                        address: contract.tenantAddress || 'الفيوم',
+                                        nationality: contract.tenantNationality || 'مصري',
+                                      });
+                                      setSelectedTenantId(created.id);
+                                    }
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '50%',
+                                      backgroundColor: '#e2e8f0',
+                                      overflow: 'hidden',
+                                      border: '1.5px solid #1b4332',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
+                                      cursor: linkedTenant ? 'pointer' : 'default',
+                                    }}
+                                    title={isAr ? 'عرض ملف المستأجر' : 'View Tenant Profile'}
+                                  >
+                                    {linkedTenant?.photoPath ? (
+                                      <img
+                                        src={linkedTenant.photoPath}
+                                        alt={linkedTenant.fullName}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                      />
+                                    ) : (
+                                      <User size={18} color="#94a3b8" />
+                                    )}
                                   </div>
-                                  <div style={{ fontSize: '12px', color: '#64748b' }}>
-                                    {formatCurrency(contract.monthlyRent, language)} • {isAr ? 'ينتهي في:' : 'Ends:'} {formatUIDate(contract.endDate)}
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontSize: '14px',
+                                        fontWeight: 800,
+                                        color: '#1b4332',
+                                        textDecoration: linkedTenant ? 'underline' : 'none',
+                                      }}
+                                    >
+                                      {linkedTenant?.fullName || contract.tenantName}
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: '#64748b' }}>
+                                      {formatCurrency(contract.monthlyRent, language)} • {isAr ? 'ينتهي في:' : 'Ends:'} {formatUIDate(contract.endDate)}
+                                    </div>
                                   </div>
                                 </div>
                               ) : (
@@ -569,6 +630,30 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                                 title={isAr ? 'تعديل الوحدة' : 'Edit Unit'}
                               >
                                 <Edit2 size={14} />
+                              </button>
+
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (confirm(isAr ? `هل أنت متأكد من حذف وحدة ${unit.unitNumber}؟` : `Delete unit ${unit.unitNumber}?`)) {
+                                    await deleteUnit(unit.id);
+                                  }
+                                }}
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #fee2e2',
+                                  backgroundColor: '#fef2f2',
+                                  color: '#dc2626',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                }}
+                                title={isAr ? 'حذف الوحدة' : 'Delete Unit'}
+                              >
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </div>
@@ -701,37 +786,68 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setPropertyModalOpen(false)}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                {isAr ? 'إلغاء' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveProperty}
-                style={{
-                  padding: '10px 22px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor: '#1b4332',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                {isAr ? 'حفظ العقار' : 'Save Property'}
-              </button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
+              {editingProperty && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (
+                      confirm(
+                        isAr
+                          ? `هل أنت متأكد من حذف عقار "${editingProperty.name}" وكافة وحداته وعقوده؟`
+                          : `Are you sure you want to delete property "${editingProperty.name}" and all its units?`
+                      )
+                    ) {
+                      await deleteProperty(editingProperty.id);
+                      setPropertyModalOpen(false);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid #fee2e2',
+                    backgroundColor: '#fef2f2',
+                    color: '#dc2626',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isAr ? 'حذف العقار' : 'Delete Property'}
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: '10px', marginRight: isAr ? 'auto' : 0, marginLeft: isAr ? 0 : 'auto' }}>
+                <button
+                  type="button"
+                  onClick={() => setPropertyModalOpen(false)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#475569',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveProperty}
+                  style={{
+                    padding: '10px 22px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: '#1b4332',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isAr ? 'حفظ العقار' : 'Save Property'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -836,37 +952,62 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => setUnitModalOpen(false)}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#475569',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                {isAr ? 'إلغاء' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveUnit}
-                style={{
-                  padding: '10px 22px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor: '#1b4332',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                {isAr ? 'حفظ الوحدة' : 'Save Unit'}
-              </button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
+              {editingUnit && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (confirm(isAr ? `هل أنت متأكد من حذف وحدة "${editingUnit.unitNumber}"؟` : `Delete unit "${editingUnit.unitNumber}"?`)) {
+                      await deleteUnit(editingUnit.id);
+                      setUnitModalOpen(false);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid #fee2e2',
+                    backgroundColor: '#fef2f2',
+                    color: '#dc2626',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isAr ? 'حذف الوحدة' : 'Delete Unit'}
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: '10px', marginRight: isAr ? 'auto' : 0, marginLeft: isAr ? 0 : 'auto' }}>
+                <button
+                  type="button"
+                  onClick={() => setUnitModalOpen(false)}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#475569',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isAr ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveUnit}
+                  style={{
+                    padding: '10px 22px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    backgroundColor: '#1b4332',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isAr ? 'حفظ الوحدة' : 'Save Unit'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

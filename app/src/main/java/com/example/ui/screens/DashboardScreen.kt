@@ -46,6 +46,7 @@ import com.example.data.model.ContractStatus
 import com.example.data.model.Payment
 import com.example.data.model.PaymentStatus
 import com.example.data.model.Property
+import com.example.data.model.Tenant
 import com.example.data.model.UnitItem
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.MintDark
@@ -64,10 +65,12 @@ fun DashboardScreen(
   contracts: List<Contract>,
   payments: List<Payment>,
   language: String,
+  tenants: List<Tenant> = emptyList(),
   onNavigateTab: (ScreenTab) -> Unit,
   onOpenContractDialog: (unitId: String?, contract: Contract?) -> Unit,
   onOpenPaymentDialog: (paymentId: String) -> Unit,
-  onOpenUnitDetail: (unitId: String) -> Unit
+  onOpenUnitDetail: (unitId: String) -> Unit,
+  onOpenTenantProfile: ((Tenant) -> Unit)? = null
 ) {
   val isAr = language == "ar"
   val chevronIcon = if (isAr) Icons.Default.ChevronLeft else Icons.Default.ChevronRight

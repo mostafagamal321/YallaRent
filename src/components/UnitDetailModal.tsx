@@ -39,12 +39,15 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
     properties,
     contracts,
     payments,
+    tenants,
+    setSelectedTenantId,
     settings,
     language,
     endContract,
     deleteContract,
     renewContract,
     markPaymentPaid,
+    deleteUnit,
   } = useApp();
 
   const isAr = language === 'ar';
@@ -53,6 +56,11 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
 
   // Active contract for this unit
   const activeContract = contracts.find((c) => !c.isHistory && c.unitId === unitId);
+  const linkedTenant = activeContract
+    ? (activeContract.tenantId
+        ? tenants.find((t) => t.id === activeContract.tenantId)
+        : tenants.find((t) => t.fullName.trim() === activeContract.tenantName.trim()))
+    : undefined;
 
   // Past contracts history for this unit
   const historyContracts = contracts.filter((c) => c.isHistory && c.unitId === unitId);
@@ -100,6 +108,7 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
       property,
       landlord: settings.landlord,
       templateText: template,
+      tenant: linkedTenant,
     });
   };
 
@@ -194,8 +203,24 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
                 </span>
               </div>
 
-              <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-                {activeContract.tenantName}
+              <div
+                style={{
+                  fontSize: '17px',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  marginBottom: '6px',
+                  cursor: linkedTenant ? 'pointer' : 'default',
+                  textDecoration: linkedTenant ? 'underline' : 'none',
+                }}
+                onClick={() => {
+                  if (linkedTenant) {
+                    onClose();
+                    setSelectedTenantId(linkedTenant.id);
+                  }
+                }}
+                title={linkedTenant ? (isAr ? 'عرض ملف المستأجر' : 'View Tenant Profile') : undefined}
+              >
+                {linkedTenant?.fullName || activeContract.tenantName}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '14px', fontSize: '13px' }}>
@@ -433,6 +458,36 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Delete Unit Action */}
+          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
+            <button
+              onClick={async () => {
+                if (confirm(isAr ? `هل أنت متأكد من حذف وحدة رقم ${unit.unitNumber}؟` : `Delete unit #${unit.unitNumber}?`)) {
+                  await deleteUnit(unit.id);
+                  onClose();
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '10px',
+                border: '1px solid #fee2e2',
+                backgroundColor: '#fef2f2',
+                color: '#dc2626',
+                fontSize: '12px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                cursor: 'pointer',
+              }}
+            >
+              <Trash2 size={15} />
+              <span>{isAr ? 'حذف هذه الوحدة بالكامل' : 'Delete this unit'}</span>
+            </button>
+          </div>
         </div>
       </div>
 

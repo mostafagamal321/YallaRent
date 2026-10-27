@@ -27,8 +27,11 @@ import com.example.data.model.PaymentStatus
 import com.example.ui.components.AppBottomNav
 import com.example.ui.components.AppTopBar
 import com.example.ui.components.PinLockDialog
+import com.example.data.model.Tenant
 import com.example.ui.dialogs.ContractDialog
 import com.example.ui.dialogs.PaymentDialog
+import com.example.ui.dialogs.TenantFormDialog
+import com.example.ui.dialogs.TenantProfileDialog
 import com.example.ui.dialogs.UnitDetailDialog
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.NotificationsScreen
@@ -36,6 +39,7 @@ import com.example.ui.screens.PaymentsScreen
 import com.example.ui.screens.PropertiesScreen
 import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.TenantsScreen
 import com.example.ui.theme.RentManagerTheme
 import com.example.ui.theme.SoftBackground
 import com.example.ui.viewmodel.RentViewModel
@@ -70,6 +74,7 @@ fun RentManagerApp(viewModel: RentViewModel) {
   val units by viewModel.units.collectAsStateWithLifecycle()
   val contracts by viewModel.contracts.collectAsStateWithLifecycle()
   val payments by viewModel.payments.collectAsStateWithLifecycle()
+  val tenants by viewModel.tenants.collectAsStateWithLifecycle()
   val activeTab by viewModel.activeTab.collectAsStateWithLifecycle()
   val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
   val isPinLocked by viewModel.isPinLocked.collectAsStateWithLifecycle()
@@ -84,6 +89,10 @@ fun RentManagerApp(viewModel: RentViewModel) {
   var activeUnitDetailId by remember { mutableStateOf<String?>(null) }
   var activePaymentDialogId by remember { mutableStateOf<String?>(null) }
 
+  var activeTenantProfile by remember { mutableStateOf<Tenant?>(null) }
+  var activeTenantForm by remember { mutableStateOf<Tenant?>(null) }
+  var showNewTenantDialog by remember { mutableStateOf(false) }
+
   if (isPinLocked) {
     PinLockDialog(
       language = settings.language,
@@ -95,9 +104,15 @@ fun RentManagerApp(viewModel: RentViewModel) {
   }
 
   // Handle Android back button
-  val isAnyDialogOpen = showContractDialog || activeUnitDetailId != null || activePaymentDialogId != null
+  val isAnyDialogOpen = showContractDialog || activeUnitDetailId != null || activePaymentDialogId != null || activeTenantProfile != null || activeTenantForm != null || showNewTenantDialog
   BackHandler(enabled = isAnyDialogOpen) {
-    if (showContractDialog) {
+    if (activeTenantProfile != null) {
+      activeTenantProfile = null
+    } else if (activeTenantForm != null) {
+      activeTenantForm = null
+    } else if (showNewTenantDialog) {
+      showNewTenantDialog = false
+    } else if (showContractDialog) {
       showContractDialog = false
       contractDialogExistingContract = null
       contractDialogUnitId = null
@@ -238,6 +253,18 @@ fun RentManagerApp(viewModel: RentViewModel) {
             }
           )
         }
+        ScreenTab.TENANTS -> {
+          TenantsScreen(
+            tenants = tenants,
+            contracts = contracts,
+            units = units,
+            properties = properties,
+            searchQuery = searchQuery,
+            language = settings.language,
+            onOpenTenantProfile = { activeTenantProfile = it },
+            onAddNewTenant = { showNewTenantDialog = true }
+          )
+        }
         ScreenTab.REPORTS -> {
           ReportsScreen(
             properties = properties,
@@ -260,6 +287,8 @@ fun RentManagerApp(viewModel: RentViewModel) {
       units = units,
       properties = properties,
       settings = settings,
+      tenants = tenants,
+      onSaveNewTenant = { newT -> viewModel.addTenant(newT) },
       onDismiss = {
         showContractDialog = false
         contractDialogExistingContract = null
@@ -350,5 +379,53 @@ fun RentManagerApp(viewModel: RentViewModel) {
         }
       )
     }
+  }
+
+  // Tenant Profile Dialog
+  activeTenantProfile?.let { tenant ->
+    TenantProfileDialog(
+      tenant = tenant,
+      contracts = contracts,
+      units = units,
+      properties = properties,
+      payments = payments,
+      settings = settings,
+      onDismiss = { activeTenantProfile = null },
+      onEditTenant = { t ->
+        activeTenantProfile = null
+        activeTenantForm = t
+      },
+      onDeleteTenant = { tenantId ->
+        viewModel.deleteTenant(tenantId)
+        activeTenantProfile = null
+      },
+      onOpenContract = { contract ->
+        activeTenantProfile = null
+        contractDialogExistingContract = contract
+        contractDialogUnitId = contract.unitId
+        showContractDialog = true
+      }
+    )
+  }
+
+  // Tenant Add / Edit Dialog
+  if (showNewTenantDialog || activeTenantForm != null) {
+    TenantFormDialog(
+      initialTenant = activeTenantForm,
+      language = settings.language,
+      onDismiss = {
+        showNewTenantDialog = false
+        activeTenantForm = null
+      },
+      onSaveTenant = { tenantToSave ->
+        if (activeTenantForm != null) {
+          viewModel.updateTenant(tenantToSave)
+        } else {
+          viewModel.addTenant(tenantToSave)
+        }
+        showNewTenantDialog = false
+        activeTenantForm = null
+      }
+    )
   }
 }

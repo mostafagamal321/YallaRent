@@ -19,14 +19,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apartment
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -49,12 +52,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.data.model.Contract
 import com.example.data.model.ContractStatus
 import com.example.data.model.Property
 import com.example.data.model.PropertyType
+import com.example.data.model.Tenant
 import com.example.data.model.UnitItem
 import com.example.ui.theme.ForestGreen
 import com.example.ui.theme.GreenDark
@@ -62,6 +70,7 @@ import com.example.ui.theme.GreenLight
 import com.example.ui.theme.RedAlert
 import com.example.ui.theme.RedLight
 import com.example.util.Formatters
+import java.io.File
 
 @Composable
 fun PropertiesScreen(
@@ -70,13 +79,18 @@ fun PropertiesScreen(
   contracts: List<Contract>,
   searchQuery: String,
   language: String,
+  tenants: List<Tenant> = emptyList(),
   onAddProperty: (String, PropertyType, String) -> Unit,
   onUpdateProperty: (Property) -> Unit,
+  onDeleteProperty: ((String) -> Unit)? = null,
   onAddUnit: (String, String, String, String?) -> Unit,
   onUpdateUnit: (UnitItem) -> Unit,
+  onDeleteUnit: ((String) -> Unit)? = null,
   onOpenContractDialog: (unitId: String?, contract: Contract?) -> Unit,
-  onOpenUnitDetail: (unitId: String) -> Unit
+  onOpenUnitDetail: (unitId: String) -> Unit,
+  onOpenTenantProfile: ((Tenant) -> Unit)? = null
 ) {
+  val context = LocalContext.current
   val isAr = language == "ar"
   var filterStatus by remember { mutableStateOf("all") }
   var expandedPropertyId by remember { mutableStateOf(properties.firstOrNull()?.id) }
@@ -401,7 +415,59 @@ fun PropertiesScreen(
                         Spacer(modifier = Modifier.height(2.dp))
 
                         if (contract != null) {
-                          Text(text = contract.tenantName, style = MaterialTheme.typography.labelMedium, color = ForestGreen)
+                          val matchedTenant = tenants.find { it.id == contract.tenantId || it.fullName.trim() == contract.tenantName.trim() }
+                          Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                              .clip(RoundedCornerShape(6.dp))
+                              .clickable(enabled = onOpenTenantProfile != null) {
+                                val tenantToOpen = matchedTenant ?: Tenant(
+                                  id = contract.tenantId.ifBlank { "tenant-${contract.id}" },
+                                  fullName = contract.tenantName,
+                                  nationalId = contract.nationalId,
+                                  job = contract.tenantJob,
+                                  phone = "",
+                                  address = contract.tenantAddress,
+                                  nationality = contract.tenantNationality
+                                )
+                                onOpenTenantProfile?.invoke(tenantToOpen)
+                              }
+                              .padding(vertical = 2.dp)
+                          ) {
+                            Box(
+                              modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE2E8F0)),
+                              contentAlignment = Alignment.Center
+                            ) {
+                              val photoFile = matchedTenant?.photoPath?.let { File(it) }
+                              if (photoFile?.exists() == true) {
+                                AsyncImage(
+                                  model = ImageRequest.Builder(context)
+                                    .data(photoFile)
+                                    .crossfade(true)
+                                    .build(),
+                                  contentDescription = contract.tenantName,
+                                  contentScale = ContentScale.Crop,
+                                  modifier = Modifier.fillMaxSize()
+                                )
+                              } else {
+                                Icon(
+                                  imageVector = Icons.Default.Person,
+                                  contentDescription = null,
+                                  tint = Color.Gray,
+                                  modifier = Modifier.size(14.dp)
+                                )
+                              }
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                              text = contract.tenantName,
+                              style = MaterialTheme.typography.labelMedium,
+                              color = ForestGreen
+                            )
+                          }
                           Text(
                             text = "${Formatters.formatCurrency(contract.monthlyRent, language)} • ${if (isAr) "ينتهي:" else "Ends:"} ${Formatters.formatUIDate(contract.endDate)}",
                             style = MaterialTheme.typography.bodySmall,
@@ -538,8 +604,23 @@ fun PropertiesScreen(
         }
       },
       dismissButton = {
-        OutlinedButton(onClick = { showPropertyDialog = false }) {
-          Text(text = if (isAr) "إلغاء" else "Cancel")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          if (editingProperty != null && onDeleteProperty != null) {
+            Button(
+              onClick = {
+                onDeleteProperty(editingProperty!!.id)
+                showPropertyDialog = false
+              },
+              colors = ButtonDefaults.buttonColors(containerColor = RedAlert)
+            ) {
+              Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(text = if (isAr) "حذف" else "Delete")
+            }
+          }
+          OutlinedButton(onClick = { showPropertyDialog = false }) {
+            Text(text = if (isAr) "إلغاء" else "Cancel")
+          }
         }
       }
     )
@@ -592,8 +673,23 @@ fun PropertiesScreen(
         }
       },
       dismissButton = {
-        OutlinedButton(onClick = { showUnitDialog = false }) {
-          Text(text = if (isAr) "إلغاء" else "Cancel")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          if (editingUnit != null && onDeleteUnit != null) {
+            Button(
+              onClick = {
+                onDeleteUnit(editingUnit!!.id)
+                showUnitDialog = false
+              },
+              colors = ButtonDefaults.buttonColors(containerColor = RedAlert)
+            ) {
+              Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(text = if (isAr) "حذف" else "Delete")
+            }
+          }
+          OutlinedButton(onClick = { showUnitDialog = false }) {
+            Text(text = if (isAr) "إلغاء" else "Cancel")
+          }
         }
       }
     )

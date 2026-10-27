@@ -105,7 +105,8 @@ fun TenantProfileDialog(
   onOpenContract: (Contract) -> Unit
 ) {
   val context = LocalContext.current
-  val isAr = settings.language == "ar"
+  val language = settings.language
+  val isAr = language == "ar"
 
   // Tenant's contracts (active + history)
   val tenantContracts = contracts.filter { it.tenantId == tenant.id || it.tenantName.trim() == tenant.fullName.trim() }

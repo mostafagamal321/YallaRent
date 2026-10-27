@@ -5,6 +5,7 @@ import { BottomNav } from './components/BottomNav';
 import { PinLockModal } from './components/PinLockModal';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { PropertiesScreen } from './screens/PropertiesScreen';
+import { TenantsScreen } from './screens/TenantsScreen';
 import { PaymentsScreen } from './screens/PaymentsScreen';
 import { NotificationsScreen } from './screens/NotificationsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
@@ -12,10 +13,12 @@ import { ReportsScreen } from './screens/ReportsScreen';
 import { ContractModal } from './components/ContractModal';
 import { UnitDetailModal } from './components/UnitDetailModal';
 import { PaymentModal } from './components/PaymentModal';
-import { Contract } from './types';
+import { TenantModal } from './components/TenantModal';
+import { TenantProfileModal } from './components/TenantProfileModal';
+import { Contract, Tenant } from './types';
 
 const MainLayout: React.FC = () => {
-  const { activeTab } = useApp();
+  const { activeTab, selectedTenantId, setSelectedTenantId } = useApp();
 
   // Modal states
   const [contractModalOpen, setContractModalOpen] = useState(false);
@@ -24,6 +27,9 @@ const MainLayout: React.FC = () => {
 
   const [unitDetailId, setUnitDetailId] = useState<string | null>(null);
   const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
+
+  const [tenantModalOpen, setTenantModalOpen] = useState(false);
+  const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
 
   const handleOpenContractModal = (unitId?: string, existingContract?: Contract) => {
     setContractModalUnitId(unitId);
@@ -56,6 +62,15 @@ const MainLayout: React.FC = () => {
           <PropertiesScreen
             onOpenContractModal={handleOpenContractModal}
             onOpenUnitDetail={handleOpenUnitDetail}
+          />
+        )}
+        {activeTab === 'tenants' && (
+          <TenantsScreen
+            onSelectTenant={(id) => setSelectedTenantId(id)}
+            onAddTenant={() => {
+              setEditingTenantId(null);
+              setTenantModalOpen(true);
+            }}
           />
         )}
         {activeTab === 'payments' && (
@@ -107,6 +122,32 @@ const MainLayout: React.FC = () => {
         <PaymentModal
           paymentId={activePaymentId}
           onClose={() => setActivePaymentId(null)}
+        />
+      )}
+
+      {/* Tenant Profile Modal */}
+      {selectedTenantId && (
+        <TenantProfileModal
+          tenantId={selectedTenantId}
+          onClose={() => setSelectedTenantId(null)}
+          onEdit={(t: Tenant) => {
+            setEditingTenantId(t.id);
+            setTenantModalOpen(true);
+          }}
+          onOpenContract={(c: Contract) => {
+            handleOpenContractModal(c.unitId, c);
+          }}
+        />
+      )}
+
+      {/* Tenant Add / Edit Modal */}
+      {tenantModalOpen && (
+        <TenantModal
+          tenantId={editingTenantId}
+          onClose={() => {
+            setTenantModalOpen(false);
+            setEditingTenantId(null);
+          }}
         />
       )}
     </div>

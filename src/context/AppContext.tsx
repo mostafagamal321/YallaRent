@@ -6,6 +6,7 @@ import {
   Payment,
   AppSettings,
   InAppNotification,
+  Tenant,
 } from '../types';
 import {
   loadInitialAppData,
@@ -21,7 +22,22 @@ import {
 } from '../services/notifications';
 import { generateMonthlyPaymentDates, toISODate } from '../utils/date';
 
-export type NavigationTab = 'dashboard' | 'properties' | 'payments' | 'notifications' | 'settings' | 'reports';
+export type NavigationTab =
+  | 'dashboard'
+  | 'properties'
+  | 'tenants'
+  | 'payments'
+  | 'notifications'
+  | 'settings'
+  | 'reports';
+
+export interface PaymentItemizedBreakdown {
+  rentAmount?: number;
+  electricityAmount?: number;
+  waterAmount?: number;
+  stairsCleaningAmount?: number;
+  previousArrearsAmount?: number;
+}
 
 interface AppContextType {
   language: 'ar' | 'en';
@@ -31,7 +47,7 @@ interface AppContextType {
   setActiveTab: (tab: NavigationTab) => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
-  
+
   // PIN lock
   isPinLocked: boolean;
   unlockWithPin: (pin: string) => boolean;
@@ -39,12 +55,17 @@ interface AppContextType {
   // Data
   properties: Property[];
   units: Unit[];
+  tenants: Tenant[];
   contracts: Contract[];
   payments: Payment[];
   settings: AppSettings;
   notifications: InAppNotification[];
   selectedPropertyId: string | null;
   setSelectedPropertyId: (id: string | null) => void;
+
+  // Selected Tenant for Profile Modal
+  selectedTenantId: string | null;
+  setSelectedTenantId: (id: string | null) => void;
 
   // Actions
   addProperty: (prop: Omit<Property, 'id'>) => Promise<void>;
@@ -55,14 +76,26 @@ interface AppContextType {
   updateUnit: (unit: Unit) => Promise<void>;
   deleteUnit: (id: string) => Promise<void>;
 
+  addTenant: (tenant: Omit<Tenant, 'id'>) => Promise<Tenant>;
+  updateTenant: (tenant: Tenant) => Promise<void>;
+  deleteTenant: (id: string) => Promise<void>;
+
   createContract: (contract: Omit<Contract, 'id' | 'status'>) => Promise<void>;
   updateContract: (contract: Contract) => Promise<void>;
   endContract: (id: string) => Promise<void>;
   deleteContract: (id: string) => Promise<void>;
   renewContract: (oldContractId: string, newStartDate: string, newEndDate: string, newRent?: number) => Promise<void>;
 
-  markPaymentPaid: (paymentId: string, paidAmount: number, paidDate: string, note?: string) => Promise<void>;
+  markPaymentPaid: (
+    paymentId: string,
+    paidAmount: number,
+    paidDate: string,
+    note?: string,
+    itemized?: PaymentItemizedBreakdown
+  ) => Promise<void>;
   updatePayment: (payment: Payment) => Promise<void>;
+  deletePayment: (id: string) => Promise<void>;
+  clearAllRents: () => Promise<void>;
 
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   resetTemplate: (type: 'apartments' | 'shops') => Promise<void>;
@@ -78,6 +111,7 @@ interface AppContextType {
     rentCollectedThisMonth: number;
     totalOverdueAmount: number;
     expiringSoonCount: number;
+    totalTenantsCount: number;
   };
 }
 
@@ -87,6 +121,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoaded, setIsLoaded] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
@@ -116,6 +151,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [isPinLocked, setIsPinLocked] = useState(false);
 
   // Initialize data on mount
@@ -124,8 +160,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const data = await loadInitialAppData();
       setProperties(data.properties);
       setUnits(data.units);
-      setContracts(data.contracts);
-      setPayments(data.payments);
+      setTenants(data.tenants || []);
+      setContracts(data.contracts || []);
+      setPayments(data.payments || []);
       setSettings(data.settings);
 
       // Check PIN lock
@@ -151,7 +188,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     document.documentElement.lang = lang;
     const updated = { ...settings, language: lang };
     setSettings(updated);
-    saveAppData(properties, units, contracts, payments, updated);
+    saveAppData(properties, units, contracts, payments, updated, tenants);
   };
 
   const toggleLanguage = () => {
@@ -177,7 +214,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [payments]);
 
-  // Compute In-app Notifications
+  // Compute In-app Notifications (linking tenant names & photos, never exposing National ID or photo in text)
   const notifications = useMemo(() => {
     return computeInAppNotifications(
       contracts,
@@ -201,7 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const stats = useMemo(() => {
     const currentMonthPrefix = toISODate(new Date()).slice(0, 7); // YYYY-MM
     const activeContracts = contracts.filter((c) => !c.isHistory && c.status === 'active');
-    
+
     // Vacant units: units that do NOT have any active contract
     const activeContractUnitIds = new Set(activeContracts.map((c) => c.unitId));
     const vacantCount = units.filter((u) => !activeContractUnitIds.has(u.id)).length;
@@ -227,8 +264,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       rentCollectedThisMonth,
       totalOverdueAmount,
       expiringSoonCount,
+      totalTenantsCount: tenants.length,
     };
-  }, [contracts, units, refreshedPayments]);
+  }, [contracts, units, refreshedPayments, tenants]);
 
   // Actions
   const persistChanges = async (
@@ -236,9 +274,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     newUnits = units,
     newContracts = contracts,
     newPayments = refreshedPayments,
-    newSettings = settings
+    newSettings = settings,
+    newTenants = tenants
   ) => {
-    await saveAppData(newProps, newUnits, newContracts, newPayments, newSettings);
+    await saveAppData(newProps, newUnits, newContracts, newPayments, newSettings, newTenants);
   };
 
   const addProperty = async (propData: Omit<Property, 'id'>) => {
@@ -268,7 +307,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUnits(nextUnits);
     setContracts(nextContracts);
     setPayments(nextPayments);
-    await persistChanges(nextProps, nextUnits, nextContracts, nextPayments);
+    await persistChanges(nextProps, nextUnits, nextContracts, nextPayments, settings, tenants);
   };
 
   const addUnit = async (unitData: Omit<Unit, 'id'>) => {
@@ -295,7 +334,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUnits(nextUnits);
     setContracts(nextContracts);
     setPayments(nextPayments);
-    await persistChanges(properties, nextUnits, nextContracts, nextPayments);
+    await persistChanges(properties, nextUnits, nextContracts, nextPayments, settings, tenants);
+  };
+
+  // Tenant Actions
+  const addTenant = async (tenantData: Omit<Tenant, 'id'>): Promise<Tenant> => {
+    const newTenant: Tenant = {
+      ...tenantData,
+      id: `tnt-${Date.now()}`,
+      nationality: tenantData.nationality || 'مصري',
+    };
+    const next = [...tenants, newTenant];
+    setTenants(next);
+    await persistChanges(properties, units, contracts, refreshedPayments, settings, next);
+    return newTenant;
+  };
+
+  const updateTenant = async (tenant: Tenant) => {
+    const next = tenants.map((t) => (t.id === tenant.id ? tenant : t));
+    // Also sync contract tenant fields if any contract links to this tenant
+    const nextContracts = contracts.map((c) => {
+      if (c.tenantId === tenant.id) {
+        return {
+          ...c,
+          tenantName: tenant.fullName,
+          tenantJob: tenant.job,
+          tenantAddress: tenant.address,
+          tenantNationality: tenant.nationality,
+          nationalId: tenant.nationalId,
+        };
+      }
+      return c;
+    });
+
+    setTenants(next);
+    setContracts(nextContracts);
+    await persistChanges(properties, units, nextContracts, refreshedPayments, settings, next);
+  };
+
+  const deleteTenant = async (id: string) => {
+    const nextTenants = tenants.filter((t) => t.id !== id);
+    // Unlink or delete contracts of this tenant
+    const nextContracts = contracts.map((c) => {
+      if (c.tenantId === id) {
+        return { ...c, tenantId: undefined };
+      }
+      return c;
+    });
+
+    setTenants(nextTenants);
+    setContracts(nextContracts);
+    if (selectedTenantId === id) {
+      setSelectedTenantId(null);
+    }
+    await persistChanges(properties, units, nextContracts, refreshedPayments, settings, nextTenants);
   };
 
   const createContract = async (contractData: Omit<Contract, 'id' | 'status'>) => {
@@ -319,6 +411,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unitId: newContract.unitId,
       dueDate,
       amount: newContract.monthlyRent,
+      rentAmount: newContract.monthlyRent,
+      electricityAmount: 0,
+      waterAmount: 0,
+      stairsCleaningAmount: 0,
+      previousArrearsAmount: 0,
       status: 'pending',
     }));
 
@@ -327,13 +424,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setContracts(nextContracts);
     setPayments(nextPayments);
-    await persistChanges(properties, units, nextContracts, nextPayments);
+    await persistChanges(properties, units, nextContracts, nextPayments, settings, tenants);
   };
 
   const updateContract = async (contract: Contract) => {
     const next = contracts.map((c) => (c.id === contract.id ? contract : c));
     setContracts(next);
-    await persistChanges(properties, units, next);
+    await persistChanges(properties, units, next, refreshedPayments, settings, tenants);
   };
 
   const endContract = async (id: string) => {
@@ -350,7 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return c;
     });
     setContracts(next);
-    await persistChanges(properties, units, next);
+    await persistChanges(properties, units, next, refreshedPayments, settings, tenants);
   };
 
   const deleteContract = async (id: string) => {
@@ -358,7 +455,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextPayments = refreshedPayments.filter((p) => p.contractId !== id);
     setContracts(nextContracts);
     setPayments(nextPayments);
-    await persistChanges(properties, units, nextContracts, nextPayments);
+    await persistChanges(properties, units, nextContracts, nextPayments, settings, tenants);
   };
 
   const renewContract = async (
@@ -406,6 +503,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unitId: newContract.unitId,
       dueDate,
       amount: newContract.monthlyRent,
+      rentAmount: newContract.monthlyRent,
+      electricityAmount: 0,
+      waterAmount: 0,
+      stairsCleaningAmount: 0,
+      previousArrearsAmount: 0,
       status: 'pending',
     }));
 
@@ -414,14 +516,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setContracts(nextContracts);
     setPayments(nextPayments);
-    await persistChanges(properties, units, nextContracts, nextPayments);
+    await persistChanges(properties, units, nextContracts, nextPayments, settings, tenants);
   };
 
   const markPaymentPaid = async (
     paymentId: string,
     paidAmount: number,
     paidDate: string,
-    note?: string
+    note?: string,
+    itemized?: PaymentItemizedBreakdown
   ) => {
     const next = refreshedPayments.map((p) => {
       if (p.id === paymentId) {
@@ -432,6 +535,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           status: isFull ? ('paid' as const) : ('pending' as const),
           paidAmount,
           paidDate,
+          rentAmount: itemized?.rentAmount !== undefined ? itemized.rentAmount : (p.rentAmount ?? paidAmount),
+          electricityAmount: itemized?.electricityAmount !== undefined ? itemized.electricityAmount : (p.electricityAmount ?? 0),
+          waterAmount: itemized?.waterAmount !== undefined ? itemized.waterAmount : (p.waterAmount ?? 0),
+          stairsCleaningAmount: itemized?.stairsCleaningAmount !== undefined ? itemized.stairsCleaningAmount : (p.stairsCleaningAmount ?? 0),
+          previousArrearsAmount: itemized?.previousArrearsAmount !== undefined ? itemized.previousArrearsAmount : (p.previousArrearsAmount ?? 0),
           note: note || (isFull ? 'تم السداد بالكامل' : `سداد جزئي (${paidAmount} من ${fullAmount})`),
         };
       }
@@ -439,19 +547,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     setPayments(next);
-    await persistChanges(properties, units, contracts, next);
+    await persistChanges(properties, units, contracts, next, settings, tenants);
   };
 
   const updatePayment = async (payment: Payment) => {
     const next = refreshedPayments.map((p) => (p.id === payment.id ? payment : p));
     setPayments(next);
-    await persistChanges(properties, units, contracts, next);
+    await persistChanges(properties, units, contracts, next, settings, tenants);
+  };
+
+  const deletePayment = async (id: string) => {
+    const next = refreshedPayments.filter((p) => p.id !== id);
+    setPayments(next);
+    await persistChanges(properties, units, contracts, next, settings, tenants);
+  };
+
+  const clearAllRents = async () => {
+    setContracts([]);
+    setPayments([]);
+    await persistChanges(properties, units, [], [], settings, tenants);
   };
 
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
     const next = { ...settings, ...newSettings };
     setSettings(next);
-    await persistChanges(properties, units, contracts, refreshedPayments, next);
+    await persistChanges(properties, units, contracts, refreshedPayments, next, tenants);
   };
 
   const resetTemplate = async (type: 'apartments' | 'shops') => {
@@ -464,10 +584,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const exportBackup = async (): Promise<boolean> => {
     const bundle: AppDataBundle = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       properties,
       units,
+      tenants,
       contracts,
       payments: refreshedPayments,
       settings: { ...settings, lastBackupDate: toISODate(new Date()) },
@@ -487,6 +608,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       setProperties(bundle.properties);
       setUnits(bundle.units);
+      setTenants(bundle.tenants || []);
       setContracts(bundle.contracts || []);
       setPayments(bundle.payments || []);
       if (bundle.settings) {
@@ -499,7 +621,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         bundle.units,
         bundle.contracts || [],
         bundle.payments || [],
-        bundle.settings || settings
+        bundle.settings || settings,
+        bundle.tenants || []
       );
       return true;
     } catch (e) {
@@ -522,18 +645,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unlockWithPin,
         properties,
         units,
+        tenants,
         contracts,
         payments: refreshedPayments,
         settings,
         notifications,
         selectedPropertyId,
         setSelectedPropertyId,
+        selectedTenantId,
+        setSelectedTenantId,
         addProperty,
         updateProperty,
         deleteProperty,
         addUnit,
         updateUnit,
         deleteUnit,
+        addTenant,
+        updateTenant,
+        deleteTenant,
         createContract,
         updateContract,
         endContract,
@@ -541,6 +670,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         renewContract,
         markPaymentPaid,
         updatePayment,
+        deletePayment,
+        clearAllRents,
         updateSettings,
         resetTemplate,
         exportBackup,

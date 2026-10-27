@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
-import { Contract, LandlordDetails, Property, Unit } from '../types';
+import { Contract, LandlordDetails, Property, Unit, Tenant, Payment } from '../types';
 import { calculateDurationText, formatPDFDate } from '../utils/date';
 import { toArabicIndicDigits } from '../utils/number';
 
@@ -12,18 +12,25 @@ export interface ContractPDFData {
   property: Property;
   landlord: LandlordDetails;
   templateText: string;
+  tenant?: Tenant;
 }
 
 // Replace placeholders in contract template
 export function fillContractTemplate(data: ContractPDFData): string {
-  const { contract, unit, property, landlord, templateText } = data;
+  const { contract, unit, property, landlord, templateText, tenant } = data;
   const durationText = calculateDurationText(contract.startDate, contract.endDate, 'ar');
   const contractDate = formatPDFDate(contract.contractDate || contract.startDate, true);
   const startDate = formatPDFDate(contract.startDate, true);
   const endDate = formatPDFDate(contract.endDate, true);
   const rent = toArabicIndicDigits(contract.monthlyRent);
   const deposit = toArabicIndicDigits(contract.depositAmount || contract.monthlyRent);
-  const nationalId = contract.nationalId ? toArabicIndicDigits(contract.nationalId) : '....................';
+
+  const effTenantName = tenant?.fullName || contract.tenantName || '';
+  const effNationalId = tenant?.nationalId || contract.nationalId || '';
+  const effJob = tenant?.job || contract.tenantJob || 'موظف';
+  const effAddress = tenant?.address || contract.tenantAddress || 'الفيوم';
+  const effNationality = tenant?.nationality || contract.tenantNationality || 'مصري';
+  const nationalIdStr = effNationalId ? toArabicIndicDigits(effNationalId) : '....................';
 
   let filled = templateText
     .replace(/{contractDate}/g, contractDate)
@@ -31,11 +38,11 @@ export function fillContractTemplate(data: ContractPDFData): string {
     .replace(/{landlordJob}/g, landlord.job || 'مهندس مدني حر')
     .replace(/{landlordAddress}/g, landlord.address || '')
     .replace(/{landlordNationality}/g, landlord.nationality || 'مصري')
-    .replace(/{tenantName}/g, contract.tenantName || '')
-    .replace(/{tenantJob}/g, contract.tenantJob || 'موظف')
-    .replace(/{tenantAddress}/g, contract.tenantAddress || 'الفيوم')
-    .replace(/{tenantNationality}/g, contract.tenantNationality || 'مصري')
-    .replace(/{nationalId}/g, nationalId)
+    .replace(/{tenantName}/g, effTenantName)
+    .replace(/{tenantJob}/g, effJob)
+    .replace(/{tenantAddress}/g, effAddress)
+    .replace(/{tenantNationality}/g, effNationality)
+    .replace(/{nationalId}/g, nationalIdStr)
     .replace(/{idIssuedFrom}/g, contract.idIssuedFrom || 'الفيوم')
     .replace(/{unitDescription}/g, unit.description || 'شقة سكنية')
     .replace(/{usagePurpose}/g, contract.usagePurpose || (property.type === 'shops' ? 'محل تجاري' : 'سكن عائلي'))
@@ -58,14 +65,20 @@ export function fillContractTemplate(data: ContractPDFData): string {
 
 // Generate A4 Arabic 2-page PDF
 export async function generateAndShareContractPDF(data: ContractPDFData): Promise<boolean> {
-  const { contract, property, unit, landlord } = data;
+  const { contract, property, unit, landlord, tenant } = data;
   const durationText = calculateDurationText(contract.startDate, contract.endDate, 'ar');
   const contractDate = formatPDFDate(contract.contractDate || contract.startDate, true);
   const startDate = formatPDFDate(contract.startDate, true);
   const endDate = formatPDFDate(contract.endDate, true);
   const rent = toArabicIndicDigits(contract.monthlyRent);
   const deposit = toArabicIndicDigits(contract.depositAmount || contract.monthlyRent);
-  const nationalId = contract.nationalId ? toArabicIndicDigits(contract.nationalId) : '....................';
+  
+  const effTenantName = tenant?.fullName || contract.tenantName || '';
+  const effNationalId = tenant?.nationalId || contract.nationalId || '';
+  const effJob = tenant?.job || contract.tenantJob || 'موظف';
+  const effAddress = tenant?.address || contract.tenantAddress || 'الفيوم';
+  const effNationality = tenant?.nationality || contract.tenantNationality || 'مصري';
+  const nationalId = effNationalId ? toArabicIndicDigits(effNationalId) : '....................';
 
   // Create an offscreen DOM element formatted as exactly 2 A4 pages
   const container = document.createElement('div');
@@ -152,12 +165,12 @@ export async function generateAndShareContractPDF(data: ContractPDFData): Promis
             <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>جنسية المالك:</strong> ${landlord.nationality}</td>
           </tr>
           <tr style="background: #f8fafc;">
-            <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>اسم المستأجر:</strong> ${contract.tenantName}</td>
-            <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>مهنة المستأجر:</strong> ${contract.tenantJob || 'موظف'}</td>
+            <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>اسم المستأجر:</strong> ${effTenantName}</td>
+            <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>مهنة المستأجر:</strong> ${effJob}</td>
           </tr>
           <tr>
-            <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>عنوان المستأجر:</strong> ${contract.tenantAddress || 'الفيوم'}</td>
-            <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>جنسية المستأجر:</strong> ${contract.tenantNationality || 'مصري'}</td>
+            <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>عنوان المستأجر:</strong> ${effAddress}</td>
+            <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>جنسية المستأجر:</strong> ${effNationality}</td>
           </tr>
           <tr style="background: #f8fafc;">
             <td style="padding: 5px 8px; border: 1px solid #cbd5e1;"><strong>الرقم القومي:</strong> ${nationalId}</td>
@@ -255,7 +268,7 @@ export async function generateAndShareContractPDF(data: ContractPDFData): Promis
               </td>
               <td style="width: 50%; padding: 8px 12px; vertical-align: top;">
                 <strong>الطرف الثاني (المستأجر):</strong><br/>
-                الاسم: ${contract.tenantName}<br/>
+                الاسم: ${effTenantName}<br/>
                 التوقيع: .......................................<br/>
                 بصمة الإبهام:
               </td>
@@ -279,7 +292,7 @@ export async function generateAndShareContractPDF(data: ContractPDFData): Promis
       </div>
 
       <div style="margin-top: 14px; text-align: center; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px;">
-        صفحة ٢ من ٢ - عقد إيجار: ${contract.tenantName} - ${property.name}
+        صفحة ٢ من ٢ - عقد إيجار: ${effTenantName} - ${property.name}
       </div>
     </div>
   `;
@@ -318,7 +331,7 @@ export async function generateAndShareContractPDF(data: ContractPDFData): Promis
     const imgData2 = canvas2.toDataURL('image/jpeg', 0.95);
     pdf.addImage(imgData2, 'JPEG', 0, 0, pdfWidth, pdfHeight);
 
-    const fileName = `عقد_${contract.tenantName.replace(/\s+/g, '_')}_وحدة_${unit.unitNumber}.pdf`;
+    const fileName = `عقد_${effTenantName.replace(/\s+/g, '_')}_وحدة_${unit.unitNumber}.pdf`;
 
     // Try saving via Capacitor Filesystem & Share
     try {
@@ -330,7 +343,7 @@ export async function generateAndShareContractPDF(data: ContractPDFData): Promis
       });
 
       await Share.share({
-        title: `عقد إيجار - ${contract.tenantName}`,
+        title: `عقد إيجار - ${effTenantName}`,
         text: `عقد إيجار وحدة ${unit.unitNumber} - ${property.name}`,
         url: writeResult.uri,
         dialogTitle: 'مشاركة عقد الإيجار',
@@ -345,6 +358,217 @@ export async function generateAndShareContractPDF(data: ContractPDFData): Promis
     return true;
   } catch (error) {
     console.error('PDF generation failed:', error);
+    return false;
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+// Receipt PDF Data Interface
+export interface ReceiptPDFData {
+  payment: Payment;
+  tenantName: string;
+  tenantPhone?: string;
+  propertyName: string;
+  unitNumber: string;
+  landlord: LandlordDetails;
+  breakdown: {
+    rentAmount: number;
+    electricityAmount: number;
+    waterAmount: number;
+    stairsCleaningAmount: number;
+    previousArrearsAmount: number;
+    totalAmount: number;
+  };
+  currentDate?: string;
+  notes?: string;
+}
+
+// Generate professional Itemized Payment Receipt PDF (إيصال استلام نقدية وتحصيل إيجار)
+export async function generateAndShareReceiptPDF(data: ReceiptPDFData): Promise<boolean> {
+  const { payment, tenantName, tenantPhone, propertyName, unitNumber, landlord, breakdown, currentDate } = data;
+  const dateStr = currentDate ? formatPDFDate(currentDate, true) : formatPDFDate(new Date().toISOString(), true);
+  const paymentMonth = payment.monthYear || 'الشهر الحالي';
+
+  const rentStr = toArabicIndicDigits(breakdown.rentAmount);
+  const elecStr = toArabicIndicDigits(breakdown.electricityAmount);
+  const waterStr = toArabicIndicDigits(breakdown.waterAmount);
+  const stairsStr = toArabicIndicDigits(breakdown.stairsCleaningAmount);
+  const arrearsStr = toArabicIndicDigits(breakdown.previousArrearsAmount);
+  const totalStr = toArabicIndicDigits(breakdown.totalAmount);
+
+  // Offscreen container for A4 / Half-A4 Receipt
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.top = '-9999px';
+  container.style.left = '-9999px';
+  container.style.width = '794px'; // standard A4 width
+  container.style.backgroundColor = '#ffffff';
+  container.style.color = '#111827';
+  container.style.fontFamily = "'Cairo', sans-serif";
+  container.style.direction = 'rtl';
+  container.style.textAlign = 'right';
+  container.style.zIndex = '-1000';
+
+  container.innerHTML = `
+    <div id="receipt-page" style="width: 794px; min-height: 1120px; padding: 45px 50px; box-sizing: border-box; background: #fff; display: flex; flex-direction: column;">
+      
+      <!-- Header Banner -->
+      <div style="border: 2px solid #1b4332; border-radius: 8px; padding: 18px 24px; margin-bottom: 24px; background: #fbfcf8;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1b4332; padding-bottom: 12px; margin-bottom: 14px;">
+          <div>
+            <h1 style="font-size: 24px; font-weight: 800; color: #1b4332; margin: 0 0 4px 0;">إيصال استلام نقدية وتحصيل</h1>
+            <p style="font-size: 13px; color: #475569; margin: 0;">إيجار شهري وخدمات ومرافق</p>
+          </div>
+          <div style="text-align: left; direction: ltr;">
+            <div style="font-size: 13px; font-weight: 700; color: #1b4332;">No: REC-${payment.id.slice(-6).toUpperCase()}</div>
+            <div style="font-size: 12px; color: #64748b; direction: rtl;">التاريخ: <strong>${dateStr}</strong></div>
+          </div>
+        </div>
+
+        <!-- Landlord & Property info bar -->
+        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+          <div><strong>المؤجر:</strong> ${landlord.name}</div>
+          <div><strong>العقار:</strong> ${propertyName}</div>
+          <div><strong>الوحدة:</strong> رقم (${unitNumber})</div>
+        </div>
+      </div>
+
+      <!-- Tenant Info Card -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px 18px; margin-bottom: 24px; font-size: 14px; line-height: 1.8;">
+        <div>وصلنا من السيد / المستأجر: <strong style="font-size: 16px; color: #1b4332;">${tenantName}</strong> ${tenantPhone ? `(هاتف: ${tenantPhone})` : ''}</div>
+        <div>وذلك عن شهر / استحقاق: <strong style="color: #1b4332;">${paymentMonth}</strong></div>
+      </div>
+
+      <!-- Itemized Breakdown Table -->
+      <div style="margin-bottom: 24px;">
+        <div style="font-size: 15px; font-weight: 800; color: #1b4332; margin-bottom: 8px;">
+          تفاصيل المبالغ المسددة (التحصيل التفصيلي):
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13.5px; border: 1.5px solid #1b4332;">
+          <thead>
+            <tr style="background: #1b4332; color: #ffffff;">
+              <th style="padding: 10px 14px; text-align: center; width: 60px; border: 1px solid #1b4332;">م</th>
+              <th style="padding: 10px 14px; text-align: right; border: 1px solid #1b4332;">البند والبيان</th>
+              <th style="padding: 10px 14px; text-align: left; width: 180px; border: 1px solid #1b4332;">المبلغ المسدد (جنيه مصري)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 9px 12px; text-align: center; border: 1px solid #cbd5e1;">١</td>
+              <td style="padding: 9px 12px; border: 1px solid #cbd5e1;"><strong>قيمة الإيجار الشهري</strong></td>
+              <td style="padding: 9px 12px; text-align: left; font-weight: 700; border: 1px solid #cbd5e1;">${rentStr} ج.م</td>
+            </tr>
+            <tr style="background: #f8fafc;">
+              <td style="padding: 9px 12px; text-align: center; border: 1px solid #cbd5e1;">٢</td>
+              <td style="padding: 9px 12px; border: 1px solid #cbd5e1;"><strong>استهلاك الكهرباء</strong></td>
+              <td style="padding: 9px 12px; text-align: left; font-weight: 700; border: 1px solid #cbd5e1;">${elecStr} ج.م</td>
+            </tr>
+            <tr>
+              <td style="padding: 9px 12px; text-align: center; border: 1px solid #cbd5e1;">٣</td>
+              <td style="padding: 9px 12px; border: 1px solid #cbd5e1;"><strong>استهلاك المياه</strong></td>
+              <td style="padding: 9px 12px; text-align: left; font-weight: 700; border: 1px solid #cbd5e1;">${waterStr} ج.م</td>
+            </tr>
+            <tr style="background: #f8fafc;">
+              <td style="padding: 9px 12px; text-align: center; border: 1px solid #cbd5e1;">٤</td>
+              <td style="padding: 9px 12px; border: 1px solid #cbd5e1;"><strong>نظافة وصيانة السلم والخدمات</strong></td>
+              <td style="padding: 9px 12px; text-align: left; font-weight: 700; border: 1px solid #cbd5e1;">${stairsStr} ج.م</td>
+            </tr>
+            <tr>
+              <td style="padding: 9px 12px; text-align: center; border: 1px solid #cbd5e1;">٥</td>
+              <td style="padding: 9px 12px; border: 1px solid #cbd5e1;"><strong>مبالغ متأخرة سابقة (سداد المتأخرات)</strong></td>
+              <td style="padding: 9px 12px; text-align: left; font-weight: 700; border: 1px solid #cbd5e1;">${arrearsStr} ج.م</td>
+            </tr>
+            <tr style="background: #eaf5ee; border-top: 2px solid #1b4332;">
+              <td colspan="2" style="padding: 12px 14px; font-weight: 800; font-size: 15px; color: #1b4332; border: 1px solid #1b4332;">
+                الإجمالي الكلي المستلم والمقبوض:
+              </td>
+              <td style="padding: 12px 14px; text-align: left; font-weight: 800; font-size: 16px; color: #1b4332; border: 1px solid #1b4332;">
+                ${totalStr} جنيهاً مصرياً
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      ${data.notes ? `
+      <div style="margin-bottom: 20px; font-size: 12.5px; color: #475569; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 10px 14px;">
+        <strong>ملاحظات:</strong> ${data.notes}
+      </div>` : ''}
+
+      <!-- Signatures Box -->
+      <div style="margin-top: auto; border: 1.5px solid #1b4332; border-radius: 6px; padding: 18px 24px; background: #fbfcf8;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <tbody>
+            <tr>
+              <td style="width: 50%; vertical-align: top;">
+                <strong>المستلم (المؤجر / الوكيل):</strong><br/><br/>
+                الاسم: ${landlord.name}<br/>
+                التوقيع: ...........................................
+              </td>
+              <td style="width: 50%; vertical-align: top;">
+                <strong>المستأجر (الدافع):</strong><br/><br/>
+                الاسم: ${tenantName}<br/>
+                التوقيع: ...........................................
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 20px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px;">
+        تم إصدار هذا الإيصال إلكترونياً من تطبيق إدارة العقارات والأملاك
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+
+  try {
+    const pageEl = container.querySelector('#receipt-page') as HTMLElement;
+    const canvas = await html2canvas(pageEl, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+    });
+
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: 'a4',
+    });
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+
+    const fileName = `ايصال_سداد_${tenantName.replace(/\s+/g, '_')}_وحدة_${unitNumber}.pdf`;
+
+    try {
+      const pdfBase64 = pdf.output('datauristring').split(',')[1];
+      const writeResult = await Filesystem.writeFile({
+        path: fileName,
+        data: pdfBase64,
+        directory: Directory.Cache,
+      });
+
+      await Share.share({
+        title: `إيصال سداد - ${tenantName}`,
+        text: `إيصال سداد إيجار وحدة ${unitNumber} - ${propertyName}`,
+        url: writeResult.uri,
+        dialogTitle: 'مشاركة إيصال السداد',
+      });
+      return true;
+    } catch (capError) {
+      console.log('Capacitor share/save fallback:', capError);
+    }
+
+    // Web download fallback
+    pdf.save(fileName);
+    return true;
+  } catch (error) {
+    console.error('Receipt PDF generation failed:', error);
     return false;
   } finally {
     document.body.removeChild(container);

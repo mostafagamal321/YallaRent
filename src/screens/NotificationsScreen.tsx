@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle,
+  User,
 } from 'lucide-react';
 
 interface NotificationsScreenProps {
@@ -22,7 +23,15 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   onOpenPaymentModal,
   onOpenUnitDetail,
 }) => {
-  const { notifications, language, setActiveTab, payments } = useApp();
+  const {
+    notifications,
+    language,
+    setActiveTab,
+    payments,
+    contracts,
+    tenants,
+    setSelectedTenantId,
+  } = useApp();
   const isAr = language === 'ar';
   const ChevronIcon = isAr ? ChevronLeft : ChevronRight;
 
@@ -144,49 +153,87 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {filtered.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => handleClickItem(item)}
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '14px',
-                padding: '14px 16px',
-                border: `1.5px solid ${getBorderColor(item.type)}`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                cursor: 'pointer',
-              }}
-            >
+          {filtered.map((item) => {
+            const contract = item.relatedContractId
+              ? contracts.find((c) => c.id === item.relatedContractId)
+              : contracts.find((c) => c.unitId === item.relatedUnitId && !c.isHistory);
+
+            const tenant = contract
+              ? (contract.tenantId
+                  ? tenants.find((t) => t.id === contract.tenantId)
+                  : tenants.find((t) => t.fullName.trim() === contract.tenantName.trim()))
+              : undefined;
+
+            return (
               <div
+                key={item.id}
+                onClick={() => handleClickItem(item)}
                 style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  backgroundColor: '#f8fafc',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '14px',
+                  padding: '14px 16px',
+                  border: `1.5px solid ${getBorderColor(item.type)}`,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
+                  gap: '12px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                  cursor: 'pointer',
                 }}
               >
-                {getIcon(item.type)}
-              </div>
+                {/* Icon or Tenant Photo badge */}
+                <div style={{ position: 'relative', width: '44px', height: '44px', flexShrink: 0 }}>
+                  {tenant?.photoPath ? (
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '50%',
+                        overflow: 'hidden',
+                        border: '2px solid #1b4332',
+                        backgroundColor: '#e2e8f0',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedTenantId(tenant.id);
+                      }}
+                      title={isAr ? 'عرض ملف المستأجر' : 'View Tenant Profile'}
+                    >
+                      <img
+                        src={tenant.photoPath}
+                        alt={tenant.fullName}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '12px',
+                        backgroundColor: '#f8fafc',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {getIcon(item.type)}
+                    </div>
+                  )}
+                </div>
 
-              <div style={{ flex: 1 }}>
-                <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
-                  {item.title}
-                </h4>
-                <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: 1.4 }}>
-                  {item.message}
-                </p>
-              </div>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', margin: '0 0 2px 0' }}>
+                    {item.title}
+                  </h4>
+                  <p style={{ fontSize: '12px', color: '#475569', margin: 0, lineHeight: 1.4 }}>
+                    {item.message}
+                  </p>
+                </div>
 
-              <ChevronIcon size={18} color="#94a3b8" />
-            </div>
-          ))}
+                <ChevronIcon size={18} color="#94a3b8" />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
