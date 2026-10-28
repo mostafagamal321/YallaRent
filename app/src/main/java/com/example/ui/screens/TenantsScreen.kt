@@ -318,15 +318,36 @@ fun TenantsScreen(
             Icon(
               imageVector = Icons.Default.People,
               contentDescription = null,
-              tint = Color(0xFFCBD5E1),
-              modifier = Modifier.size(48.dp)
+              tint = if (tenants.isEmpty()) ForestGreen else Color(0xFFCBD5E1),
+              modifier = Modifier.size(54.dp)
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-              text = if (isAr) "لا يوجد مستأجرون يطابقون شروط البحث" else "No tenants match current criteria",
-              style = MaterialTheme.typography.bodyMedium,
-              color = Color(0xFF64748B)
+              text = if (tenants.isEmpty()) (if (isAr) "لا يوجد مستأجرون مسجلون بعد" else "No tenants registered yet")
+              else (if (isAr) "لا يوجد مستأجرون يطابقون شروط البحث" else "No tenants match current criteria"),
+              style = MaterialTheme.typography.titleMedium,
+              color = Color(0xFF0F172A)
             )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+              text = if (tenants.isEmpty()) (if (isAr) "سجّل بيانات المستأجرين وبطاقات الهوية وأرقام الهواتف لربطهم بالعقود وتتبع دفعاتهم." else "Add tenants with contact details and IDs to link to leases.")
+              else (if (isAr) "جرب البحث بالاسم أو تغيير تصنيف المبنى أو الحالة." else "Try searching by name or altering filters."),
+              style = MaterialTheme.typography.bodySmall,
+              color = Color(0xFF64748B),
+              textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            if (tenants.isEmpty()) {
+              Spacer(modifier = Modifier.height(16.dp))
+              Button(
+                onClick = onAddNewTenant,
+                colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+                shape = RoundedCornerShape(10.dp)
+              ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = if (isAr) "إضافة مستأجر جديد" else "Add New Tenant")
+              }
+            }
           }
         }
       }

@@ -135,6 +135,7 @@ const MainLayout: React.FC = () => {
             setTenantModalOpen(true);
           }}
           onOpenContract={(c: Contract) => {
+            setSelectedTenantId(null);
             handleOpenContractModal(c.unitId, c);
           }}
         />

@@ -58,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import com.example.data.model.Contract
 import com.example.data.model.ContractStatus
 import com.example.data.model.Property
@@ -83,9 +85,10 @@ fun PropertiesScreen(
   onAddProperty: (String, PropertyType, String) -> Unit,
   onUpdateProperty: (Property) -> Unit,
   onDeleteProperty: ((String) -> Unit)? = null,
-  onAddUnit: (String, String, String, String?) -> Unit,
+  onAddUnit: (String, String, String, String?, Double?) -> Unit,
   onUpdateUnit: (UnitItem) -> Unit,
   onDeleteUnit: ((String) -> Unit)? = null,
+  onUpdateContractRentForUnit: ((String, Double) -> Unit)? = null,
   onOpenContractDialog: (unitId: String?, contract: Contract?) -> Unit,
   onOpenUnitDetail: (unitId: String) -> Unit,
   onOpenTenantProfile: ((Tenant) -> Unit)? = null
@@ -109,6 +112,7 @@ fun PropertiesScreen(
   var unitNumInput by remember { mutableStateOf("") }
   var unitDescInput by remember { mutableStateOf("") }
   var unitNotesInput by remember { mutableStateOf("") }
+  var unitRentInput by remember { mutableStateOf("") }
 
   val activeContractsByUnitId = contracts.filter { !it.isHistory }.associateBy { it.unitId }
 
@@ -221,6 +225,59 @@ fun PropertiesScreen(
                 color = if (isSelected) Color.White else Color(0xFF475569),
                 style = MaterialTheme.typography.labelSmall
               )
+            }
+          }
+        }
+      }
+    }
+
+    // Empty State for Properties
+    if (properties.isEmpty()) {
+      item {
+        Card(
+          shape = RoundedCornerShape(16.dp),
+          colors = CardDefaults.cardColors(containerColor = Color.White),
+          border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+          modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+        ) {
+          Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+          ) {
+            Icon(
+              imageVector = Icons.Default.Apartment,
+              contentDescription = null,
+              tint = ForestGreen,
+              modifier = Modifier.size(54.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+              text = if (isAr) "لا توجد عقارات مسجلة بعد" else "No properties registered yet",
+              style = MaterialTheme.typography.titleMedium,
+              color = Color(0xFF0F172A)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+              text = if (isAr) "ابدأ بإضافة أول عقار لديك (عمارة، برج سكني، أو محلات تجارية) لإضافة الوحدات والعقود بكل سهولة." else "Start by adding your first property to manage units and contracts.",
+              style = MaterialTheme.typography.bodySmall,
+              color = Color(0xFF64748B),
+              textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+              onClick = {
+                editingProperty = null
+                propNameInput = ""
+                propTypeInput = PropertyType.APARTMENTS
+                propAddressInput = ""
+                showPropertyDialog = true
+              },
+              colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+              shape = RoundedCornerShape(10.dp)
+            ) {
+              Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+              Spacer(modifier = Modifier.width(6.dp))
+              Text(text = if (isAr) "إضافة أول عقار" else "Add First Property")
             }
           }
         }
@@ -341,6 +398,7 @@ fun PropertiesScreen(
                     unitNumInput = ""
                     unitDescInput = if (isShop) (if (isAr) "محل تجاري" else "Commercial Shop") else (if (isAr) "شقة سكنية" else "Apartment")
                     unitNotesInput = ""
+                    unitRentInput = ""
                     showUnitDialog = true
                   },
                   shape = RoundedCornerShape(8.dp),
@@ -474,11 +532,20 @@ fun PropertiesScreen(
                             color = Color(0xFF64748B)
                           )
                         } else {
-                          Text(
-                            text = unit.notes ?: (if (isAr) "لا يوجد عقد نشط حالياً" else "No active lease"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (unit.notes != null) Color(0xFF0284C7) else Color(0xFF64748B)
-                          )
+                          Column {
+                            if (unit.monthlyRent != null && unit.monthlyRent > 0) {
+                              Text(
+                                text = "${if (isAr) "الإيجار المتوقع:" else "Expected Rent:"} ${Formatters.formatCurrency(unit.monthlyRent, language)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF0284C7)
+                              )
+                            }
+                            Text(
+                              text = unit.notes ?: (if (isAr) "لا يوجد عقد نشط حالياً" else "No active lease"),
+                              style = MaterialTheme.typography.bodySmall,
+                              color = if (unit.notes != null) Color(0xFF64748B) else Color(0xFF94A3B8)
+                            )
+                          }
                         }
                       }
 
@@ -518,6 +585,9 @@ fun PropertiesScreen(
                             unitNumInput = unit.unitNumber
                             unitDescInput = unit.description
                             unitNotesInput = unit.notes ?: ""
+                            val activeContract = activeContractsByUnitId[unit.id]
+                            val currentRent = activeContract?.monthlyRent ?: unit.monthlyRent
+                            unitRentInput = if (currentRent != null && currentRent > 0) currentRent.toInt().toString() else ""
                             showUnitDialog = true
                           },
                           modifier = Modifier.size(32.dp)
@@ -628,6 +698,8 @@ fun PropertiesScreen(
 
   // Unit Add/Edit Dialog
   if (showUnitDialog) {
+    val activeContract = activeContractsByUnitId[editingUnit?.id]
+
     AlertDialog(
       onDismissRequest = { showUnitDialog = false },
       title = {
@@ -641,12 +713,38 @@ fun PropertiesScreen(
             label = { Text(if (isAr) "رقم أو معرف الوحدة" else "Unit Number") },
             modifier = Modifier.fillMaxWidth()
           )
+
+          OutlinedTextField(
+            value = unitRentInput,
+            onValueChange = { unitRentInput = it },
+            label = { Text(if (isAr) "قيمة الإيجار الشهري (ج.م)" else "Monthly Rent (EGP)") },
+            placeholder = { Text("مثال: 3000") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            supportingText = {
+              if (activeContract != null) {
+                Text(
+                  text = if (isAr) "العقد الساري: ${activeContract.tenantName} - سيتم تحديث الإيجار بالعقد والأقساط غير المدفوعة تلقائياً" else "Active lease: will update lease & pending installments automatically",
+                  color = ForestGreen,
+                  fontSize = 11.sp
+                )
+              } else {
+                Text(
+                  text = if (isAr) "تحديد الإيجار المتوقع أو المعتمد لهذه الوحدة" else "Target/expected monthly rent for this unit",
+                  color = Color(0xFF64748B),
+                  fontSize = 11.sp
+                )
+              }
+            },
+            modifier = Modifier.fillMaxWidth()
+          )
+
           OutlinedTextField(
             value = unitDescInput,
             onValueChange = { unitDescInput = it },
             label = { Text(if (isAr) "بيان ووصف العين" else "Unit Description") },
             modifier = Modifier.fillMaxWidth()
           )
+
           OutlinedTextField(
             value = unitNotesInput,
             onValueChange = { unitNotesInput = it },
@@ -659,10 +757,20 @@ fun PropertiesScreen(
         Button(
           onClick = {
             if (unitNumInput.isNotBlank()) {
+              val rentVal = unitRentInput.toDoubleOrNull()
               if (editingUnit != null) {
-                onUpdateUnit(editingUnit!!.copy(unitNumber = unitNumInput.trim(), description = unitDescInput.trim(), notes = unitNotesInput.trim().ifBlank { null }))
+                val updatedUnit = editingUnit!!.copy(
+                  unitNumber = unitNumInput.trim(),
+                  description = unitDescInput.trim(),
+                  notes = unitNotesInput.trim().ifBlank { null },
+                  monthlyRent = rentVal
+                )
+                onUpdateUnit(updatedUnit)
+                if (rentVal != null && rentVal > 0) {
+                  onUpdateContractRentForUnit?.invoke(editingUnit!!.id, rentVal)
+                }
               } else {
-                onAddUnit(targetPropertyId, unitNumInput.trim(), unitDescInput.trim(), unitNotesInput.trim())
+                onAddUnit(targetPropertyId, unitNumInput.trim(), unitDescInput.trim(), unitNotesInput.trim(), rentVal)
               }
               showUnitDialog = false
             }

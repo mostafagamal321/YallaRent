@@ -12,7 +12,9 @@ import {
   Check,
   Building,
   Calendar,
+  Plus,
 } from 'lucide-react';
+import { CreatePaymentModal } from '../components/CreatePaymentModal';
 
 interface PaymentsScreenProps {
   onOpenPaymentModal: (paymentId: string) => void;
@@ -25,6 +27,7 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({ onOpenPaymentMod
   const [statusFilter, setStatusFilter] = useState<'all' | 'overdue' | 'pending' | 'paid'>('all');
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
   const [monthFilter, setMonthFilter] = useState<string>('all');
+  const [createPaymentOpen, setCreatePaymentOpen] = useState(false);
 
   const propertyMap = new Map(properties.map((p) => [p.id, p]));
   const unitMap = new Map(units.map((u) => [u.id, u]));
@@ -75,14 +78,38 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({ onOpenPaymentMod
 
   return (
     <div style={{ padding: '16px', paddingBottom: '90px' }}>
-      {/* Title */}
-      <div style={{ marginBottom: '14px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#1e293b', margin: 0 }}>
-          {isAr ? 'سجل تحصيل الإيجارات' : 'Rent Collection Ledger'}
-        </h2>
-        <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
-          {isAr ? 'إدارة وتوثيق سداد الأقساط الشهرية والمتأخرات' : 'Track and collect monthly rent installments'}
-        </p>
+      {/* Title & Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <div>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+            {isAr ? 'سجل تحصيل الإيجارات' : 'Rent Collection Ledger'}
+          </h2>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0 0' }}>
+            {isAr ? 'إدارة وتوثيق سداد الأقساط الشهرية والمتأخرات' : 'Track and collect monthly rent installments'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setCreatePaymentOpen(true)}
+          style={{
+            backgroundColor: '#1b4332',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '10px 16px',
+            fontSize: '13px',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(27,67,50,0.2)',
+          }}
+        >
+          <Plus size={18} />
+          <span>{isAr ? 'إضافة دفعة جديدة' : 'Add New Payment'}</span>
+        </button>
       </div>
 
       {/* Summary Card */}
@@ -293,6 +320,10 @@ export const PaymentsScreen: React.FC<PaymentsScreenProps> = ({ onOpenPaymentMod
             );
           })}
         </div>
+      )}
+
+      {createPaymentOpen && (
+        <CreatePaymentModal onClose={() => setCreatePaymentOpen(false)} />
       )}
     </div>
   );

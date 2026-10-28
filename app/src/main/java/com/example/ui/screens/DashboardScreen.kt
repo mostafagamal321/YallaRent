@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -98,6 +100,74 @@ fun DashboardScreen(
       .padding(horizontal = 16.dp, vertical = 12.dp),
     verticalArrangement = Arrangement.spacedBy(16.dp)
   ) {
+    if (properties.isEmpty()) {
+      item {
+        Card(
+          shape = RoundedCornerShape(16.dp),
+          colors = CardDefaults.cardColors(containerColor = Color.White),
+          border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFBBF7D0)),
+          elevation = CardDefaults.cardElevation(2.dp),
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Box(
+                modifier = Modifier
+                  .size(42.dp)
+                  .clip(RoundedCornerShape(10.dp))
+                  .background(MintLight),
+                contentAlignment = Alignment.Center
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Apartment,
+                  contentDescription = null,
+                  tint = ForestGreen,
+                  modifier = Modifier.size(24.dp)
+                )
+              }
+              Spacer(modifier = Modifier.width(10.dp))
+              Column {
+                Text(
+                  text = if (isAr) "مرحباً بك في إدارة الأملاك والإيجارات" else "Welcome to Rent Manager",
+                  style = MaterialTheme.typography.titleMedium,
+                  color = ForestGreen
+                )
+                Text(
+                  text = if (isAr) "قاعدة بياناتك فارغة تماماً وجاهزة لإدخال بياناتك الحقيقية." else "Your database is clean and ready for your data.",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = Color(0xFF64748B)
+                )
+              }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+              Button(
+                onClick = { onNavigateTab(ScreenTab.PROPERTIES) },
+                colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+              ) {
+                Text(text = if (isAr) "+ أضف أول عقار" else "+ Add Property", fontSize = 12.sp)
+              }
+              Button(
+                onClick = { onNavigateTab(ScreenTab.TENANTS) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7)),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+              ) {
+                Text(text = if (isAr) "+ أضف مستأجراً" else "+ Add Tenant", fontSize = 12.sp)
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Top Overview Card
     item {
       Card(

@@ -45,6 +45,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
     addUnit,
     updateUnit,
     deleteUnit,
+    updateContractRentForUnit,
   } = useApp();
 
   const isAr = language === 'ar';
@@ -67,6 +68,11 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   const [unitNumber, setUnitNumber] = useState('');
   const [unitDesc, setUnitDesc] = useState('');
   const [unitNotes, setUnitNotes] = useState('');
+  const [unitRent, setUnitRent] = useState<string>('');
+
+  // Quick Rent Edit Modal State
+  const [quickRentUnit, setQuickRentUnit] = useState<Unit | null>(null);
+  const [quickRentValue, setQuickRentValue] = useState<string>('');
 
   // Map of active contracts by unitId
   const activeContractsByUnitId = useMemo(() => {
@@ -194,30 +200,42 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
       setUnitNumber(unit.unitNumber);
       setUnitDesc(unit.description);
       setUnitNotes(unit.notes || '');
+      const activeContract = activeContractsByUnitId.get(unit.id);
+      setUnitRent(activeContract ? String(activeContract.monthlyRent) : (unit.targetRent ? String(unit.targetRent) : ''));
     } else {
       setEditingUnit(null);
       setUnitNumber('');
       setUnitDesc(isAr ? 'شقة سكنية' : 'Apartment');
       setUnitNotes('');
+      setUnitRent('');
     }
     setUnitModalOpen(true);
   };
 
   const handleSaveUnit = async () => {
     if (!unitNumber.trim()) return;
+    const rentNum = unitRent.trim() ? Number(unitRent) : undefined;
     if (editingUnit) {
       await updateUnit({
         ...editingUnit,
         unitNumber: unitNumber.trim(),
         description: unitDesc.trim(),
         notes: unitNotes.trim() || undefined,
+        targetRent: rentNum,
       });
+
+      // If unit has an active contract and rent was entered/changed, update contract rent!
+      const activeContract = activeContractsByUnitId.get(editingUnit.id);
+      if (activeContract && rentNum !== undefined && !isNaN(rentNum) && rentNum > 0 && rentNum !== activeContract.monthlyRent) {
+        await updateContractRentForUnit(editingUnit.id, rentNum);
+      }
     } else {
       await addUnit({
         propertyId: targetPropertyId,
         unitNumber: unitNumber.trim(),
         description: unitDesc.trim(),
         notes: unitNotes.trim() || undefined,
+        targetRent: rentNum,
       });
     }
     setUnitModalOpen(false);
@@ -561,8 +579,39 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                                     >
                                       {linkedTenant?.fullName || contract.tenantName}
                                     </div>
-                                    <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                      {formatCurrency(contract.monthlyRent, language)} • {isAr ? 'ينتهي في:' : 'Ends:'} {formatUIDate(contract.endDate)}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
+                                      <span style={{ fontSize: '12px', fontWeight: 800, color: '#1b4332' }}>
+                                        {formatCurrency(contract.monthlyRent, language)}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setQuickRentUnit(unit);
+                                          setQuickRentValue(String(contract.monthlyRent));
+                                        }}
+                                        style={{
+                                          background: '#ecfdf5',
+                                          color: '#065f46',
+                                          border: '1px solid #a7f3d0',
+                                          borderRadius: '6px',
+                                          padding: '2px 7px',
+                                          fontSize: '11px',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '3px',
+                                        }}
+                                        title={isAr ? 'تعديل قيمة الإيجار مباشرة' : 'Edit Rent'}
+                                      >
+                                        <Edit2 size={11} />
+                                        <span>{isAr ? 'تعديل الإيجار' : 'Edit Rent'}</span>
+                                      </button>
+                                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>•</span>
+                                      <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                        {isAr ? 'ينتهي:' : 'Ends:'} {formatUIDate(contract.endDate)}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
@@ -573,28 +622,56 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                                   ) : (
                                     <span>{isAr ? 'لا يوجد عقد نشط حالياً' : 'No active lease'}</span>
                                   )}
+                                  {unit.targetRent && (
+                                    <div style={{ fontSize: '11px', color: '#1b4332', fontWeight: 700, marginTop: '2px' }}>
+                                      {isAr ? 'الإيجار المستهدف:' : 'Target Rent:'} {formatCurrency(unit.targetRent, language)}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
 
                             {/* Actions */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {contract ? (
-                                <button
-                                  onClick={() => onOpenUnitDetail(unit.id)}
-                                  style={{
-                                    backgroundColor: '#1b4332',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    padding: '8px 12px',
-                                    fontSize: '12px',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                  }}
-                                >
-                                  {isAr ? 'العقد والتفاصيل' : 'Lease'}
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => onOpenUnitDetail(unit.id)}
+                                    style={{
+                                      backgroundColor: '#1b4332',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '8px',
+                                      padding: '8px 10px',
+                                      fontSize: '12px',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    {isAr ? 'التفاصيل' : 'Details'}
+                                  </button>
+
+                                  <button
+                                    onClick={() => onOpenContractModal(unit.id, contract)}
+                                    style={{
+                                      backgroundColor: '#f0fdf4',
+                                      color: '#166534',
+                                      border: '1px solid #bbf7d0',
+                                      borderRadius: '8px',
+                                      padding: '8px 10px',
+                                      fontSize: '12px',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                    }}
+                                    title={isAr ? 'تعديل بيانات العقد والإيجار' : 'Edit Lease & Rent'}
+                                  >
+                                    <Edit2 size={13} />
+                                    <span>{isAr ? 'تعديل العقد' : 'Edit Lease'}</span>
+                                  </button>
+                                </>
                               ) : (
                                 <button
                                   onClick={() => onOpenContractModal(unit.id)}
@@ -950,6 +1027,35 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                   }}
                 />
               </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#1b4332', marginBottom: '4px' }}>
+                  {isAr ? 'قيمة الإيجار الشهري (ج.م)' : 'Monthly Rent (EGP)'}
+                </label>
+                <input
+                  type="number"
+                  value={unitRent}
+                  onChange={(e) => setUnitRent(e.target.value)}
+                  placeholder={isAr ? 'مثال: 3000' : 'e.g. 3000'}
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    border: '2px solid #1b4332',
+                    fontSize: '15px',
+                    fontWeight: 800,
+                    color: '#1b4332',
+                    backgroundColor: '#f0fdf4',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <span style={{ display: 'block', fontSize: '11px', color: '#0369a1', marginTop: '4px', lineHeight: '1.4' }}>
+                  {editingUnit && activeContractsByUnitId.has(editingUnit.id)
+                    ? (isAr ? '💡 تعديل هذا المبلغ سيقوم بتحديث العقد الساري فوراً وتعديل جميع الأقساط القادمة غير المسددة' : '💡 Updating this amount immediately updates the active lease and future unpaid bills')
+                    : (isAr ? 'القيمة الإيجارية المستهدفة لهذه الوحدة' : 'Target rent for this unit')}
+                </span>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1008,6 +1114,107 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                   {isAr ? 'حفظ الوحدة' : 'Save Unit'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Rent Modal */}
+      {quickRentUnit && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            zIndex: 300,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+          onClick={() => setQuickRentUnit(null)}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              maxWidth: '420px',
+              width: '100%',
+              padding: '22px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.25)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1e293b', margin: '0 0 6px 0' }}>
+              {isAr ? `تعديل قيمة الإيجار الشهري (وحدة ${quickRentUnit.unitNumber})` : `Edit Monthly Rent (Unit ${quickRentUnit.unitNumber})`}
+            </h3>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+              {isAr ? 'سيتم تطبيق القيمة الجديدة فوراً على العقد الساري وتحديث كافة الأقساط القادمة غير المسددة' : 'New amount will be applied immediately to the active contract and upcoming unpaid bills'}
+            </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                {isAr ? 'قيمة الإيجار الشهري الجديدة (ج.م)' : 'New Monthly Rent (EGP)'}
+              </label>
+              <input
+                type="number"
+                autoFocus
+                value={quickRentValue}
+                onChange={(e) => setQuickRentValue(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '46px',
+                  padding: '0 12px',
+                  borderRadius: '10px',
+                  border: '2px solid #1b4332',
+                  fontSize: '16px',
+                  fontWeight: 800,
+                  color: '#1b4332',
+                  backgroundColor: '#f0fdf4',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setQuickRentUnit(null)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                {isAr ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const num = Number(quickRentValue);
+                  if (num > 0 && quickRentUnit) {
+                    await updateContractRentForUnit(quickRentUnit.id, num);
+                    setQuickRentUnit(null);
+                  }
+                }}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#1b4332',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                {isAr ? 'حفظ وتحديث الإيجار' : 'Save & Update Rent'}
+              </button>
             </div>
           </div>
         </div>

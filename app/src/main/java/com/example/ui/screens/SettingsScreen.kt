@@ -79,10 +79,13 @@ fun SettingsScreen(
   onUpdateSettings: (AppSettings) -> Unit,
   onResetTemplate: (PropertyType) -> Unit,
   onExportBackup: () -> String,
-  onImportBackup: (String) -> Boolean
+  onImportBackup: (String) -> Boolean,
+  onClearAllData: (() -> Unit)? = null
 ) {
   val context = LocalContext.current
   val isAr = settings.language == "ar"
+
+  var showResetConfirmDialog by remember { mutableStateOf(false) }
 
   // Landlord Form
   var landlordName by remember { mutableStateOf(settings.landlord.name) }
@@ -511,8 +514,91 @@ fun SettingsScreen(
       }
     }
 
+    // Reset Data / Start from Empty
+    item {
+      Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFECACA)),
+        elevation = CardDefaults.cardElevation(2.dp),
+        modifier = Modifier.fillMaxWidth()
+      ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+              imageVector = Icons.Default.RestartAlt,
+              contentDescription = null,
+              tint = RedAlert,
+              modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+              text = if (isAr) "البدء من الصفر وتفريغ قاعدة البيانات" else "Start from Empty / Reset Data",
+              style = MaterialTheme.typography.titleSmall,
+              color = RedAlert
+            )
+          }
+
+          Spacer(modifier = Modifier.height(6.dp))
+          Text(
+            text = if (isAr) "تفريغ كافة العقارات والوحدات والعقود والمستأجرين والدفعات والبدء بقاعدة بيانات جديدة ونظيفة لإدخال بياناتك الحقيقية من الصفر." else "Clear all properties, units, leases, tenants, and payments to start completely fresh.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF64748B)
+          )
+
+          Spacer(modifier = Modifier.height(14.dp))
+
+          Button(
+            onClick = { showResetConfirmDialog = true },
+            colors = ButtonDefaults.buttonColors(containerColor = RedAlert),
+            shape = RoundedCornerShape(10.dp)
+          ) {
+            Icon(imageVector = Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = if (isAr) "تفريغ كافة البيانات والبدء من الصفر" else "Clear All Data & Start Fresh",
+              fontSize = 12.sp
+            )
+          }
+        }
+      }
+    }
+
     item {
       Spacer(modifier = Modifier.height(40.dp))
     }
+  }
+
+  // Reset Confirmation Dialog
+  if (showResetConfirmDialog) {
+    AlertDialog(
+      onDismissRequest = { showResetConfirmDialog = false },
+      title = {
+        Text(text = if (isAr) "تأكيد تفريغ كافة البيانات" else "Confirm Reset All Data")
+      },
+      text = {
+        Text(
+          text = if (isAr) "هل أنت متأكد من رغبتك في حذف جميع العقارات والوحدات والعقود والمستأجرين والدفعات والبدء بقاعدة بيانات فارغة تماماً؟ يمكنك إدخال كافة بياناتك الخاصة بحرية بعد ذلك."
+          else "Are you sure you want to clear all data and start completely fresh? You will be able to add your real properties, contracts, and tenants."
+        )
+      },
+      confirmButton = {
+        Button(
+          onClick = {
+            onClearAllData?.invoke()
+            showResetConfirmDialog = false
+            Toast.makeText(context, if (isAr) "تم تفريغ كافة البيانات والبدء من الصفر بنجاح" else "All data cleared successfully", Toast.LENGTH_SHORT).show()
+          },
+          colors = ButtonDefaults.buttonColors(containerColor = RedAlert)
+        ) {
+          Text(text = if (isAr) "تأكيد والبدء من الصفر" else "Confirm & Start Fresh")
+        }
+      },
+      dismissButton = {
+        OutlinedButton(onClick = { showResetConfirmDialog = false }) {
+          Text(text = if (isAr) "إلغاء" else "Cancel")
+        }
+      }
+    )
   }
 }

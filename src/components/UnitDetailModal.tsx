@@ -46,6 +46,7 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
     endContract,
     deleteContract,
     renewContract,
+    updateContractRentForUnit,
     markPaymentPaid,
     deleteUnit,
   } = useApp();
@@ -75,6 +76,10 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
   const [newStartDate, setNewStartDate] = useState('');
   const [newEndDate, setNewEndDate] = useState('');
   const [newRent, setNewRent] = useState<number>(activeContract?.monthlyRent || 0);
+
+  // Quick edit rent state
+  const [showEditRentModal, setShowEditRentModal] = useState(false);
+  const [editRentAmount, setEditRentAmount] = useState<number>(activeContract?.monthlyRent || 0);
 
   if (!unit || !property) return null;
 
@@ -225,8 +230,34 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '14px', fontSize: '13px' }}>
                 <div>
-                  <span style={{ color: '#64748b' }}>{isAr ? 'الإيجار الشهري:' : 'Monthly Rent:'}</span>{' '}
-                  <strong style={{ color: '#1b4332' }}>{formatCurrency(activeContract.monthlyRent, language)}</strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ color: '#64748b' }}>{isAr ? 'الإيجار الشهري:' : 'Monthly Rent:'}</span>
+                    <strong style={{ color: '#1b4332', fontSize: '15px' }}>{formatCurrency(activeContract.monthlyRent, language)}</strong>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditRentAmount(activeContract.monthlyRent);
+                        setShowEditRentModal(true);
+                      }}
+                      style={{
+                        background: '#ecfdf5',
+                        border: '1px solid #a7f3d0',
+                        color: '#065f46',
+                        borderRadius: '6px',
+                        padding: '2px 7px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                      }}
+                      title={isAr ? 'تعديل قيمة الإيجار' : 'Edit Rent'}
+                    >
+                      <Edit2 size={11} />
+                      <span>{isAr ? 'تعديل الإيجار' : 'Edit Rent'}</span>
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <span style={{ color: '#64748b' }}>{isAr ? 'يوم الاستحقاق:' : 'Due Day:'}</span>{' '}
@@ -574,6 +605,106 @@ export const UnitDetailModal: React.FC<UnitDetailModalProps> = ({
                 style={{ flex: 2, padding: '10px', borderRadius: '10px', border: 'none', backgroundColor: '#0284c7', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}
               >
                 {isAr ? 'تأكيد التجديد' : 'Confirm Renewal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Edit Rent Modal */}
+      {showEditRentModal && activeContract && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            zIndex: 350,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+          onClick={() => setShowEditRentModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '20px',
+              maxWidth: '420px',
+              width: '100%',
+              padding: '22px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.25)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#1e293b', margin: '0 0 6px 0' }}>
+              {isAr ? 'تعديل قيمة الإيجار الشهري' : 'Edit Monthly Rent'}
+            </h3>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+              {isAr ? 'سيتم تحديث قيمة الإيجار في العقد الساري وجميع الأقساط القادمة فوراً' : 'The new rent will update the active lease and upcoming payments immediately'}
+            </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                {isAr ? 'قيمة الإيجار الجديدة (ج.م)' : 'New Monthly Rent (EGP)'}
+              </label>
+              <input
+                type="number"
+                autoFocus
+                value={editRentAmount}
+                onChange={(e) => setEditRentAmount(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  height: '46px',
+                  padding: '0 12px',
+                  borderRadius: '10px',
+                  border: '2px solid #1b4332',
+                  fontSize: '16px',
+                  fontWeight: 800,
+                  color: '#1b4332',
+                  backgroundColor: '#f0fdf4',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowEditRentModal(false)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                {isAr ? 'إلغاء' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (editRentAmount > 0) {
+                    await updateContractRentForUnit(unitId, editRentAmount);
+                    setShowEditRentModal(false);
+                  }
+                }}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: '#1b4332',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                {isAr ? 'حفظ وتحديث الإيجار' : 'Save & Update Rent'}
               </button>
             </div>
           </div>

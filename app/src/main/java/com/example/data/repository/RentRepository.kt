@@ -77,14 +77,9 @@ class RentRepository(private val context: Context) {
   }
 
   private fun loadData() {
-    val isInit = prefs.getBoolean("is_initialized", false)
-    if (!isInit) {
-      // Seed initial data
-      val initialProperties = SeedData.INITIAL_PROPERTIES
-      val initialUnits = SeedData.INITIAL_UNITS
-      val initialTenants = SeedData.INITIAL_TENANTS
-      val initialContracts = SeedData.INITIAL_CONTRACTS
-      val initialPayments = SeedData.generateInitialPayments()
+    val isCleanStarted = prefs.getBoolean("is_clean_started_v3", false)
+    if (!isCleanStarted) {
+      // Start completely clean and empty as requested
       val initialSettings = AppSettings(
         templates = ContractTemplates(
           apartments = DefaultTemplates.APARTMENT_TEMPLATE,
@@ -92,22 +87,25 @@ class RentRepository(private val context: Context) {
         )
       )
 
-      _properties.value = initialProperties
-      _units.value = initialUnits
-      _tenants.value = initialTenants
-      _contracts.value = initialContracts
-      _payments.value = initialPayments
+      _properties.value = emptyList()
+      _units.value = emptyList()
+      _tenants.value = emptyList()
+      _contracts.value = emptyList()
+      _payments.value = emptyList()
       _settings.value = initialSettings
 
       saveAll(
-        props = initialProperties,
-        uList = initialUnits,
-        cntList = initialContracts,
-        payList = initialPayments,
-        tenantList = initialTenants,
+        props = emptyList(),
+        uList = emptyList(),
+        cntList = emptyList(),
+        payList = emptyList(),
+        tenantList = emptyList(),
         appSettings = initialSettings
       )
-      prefs.edit().putBoolean("is_initialized", true).apply()
+      prefs.edit()
+        .putBoolean("is_clean_started_v3", true)
+        .putBoolean("is_initialized", true)
+        .apply()
     } else {
       // Load from prefs
       val propsJson = prefs.getString("properties", null)
@@ -117,10 +115,10 @@ class RentRepository(private val context: Context) {
       val tenantsJson = prefs.getString("tenants", null)
       val settingsJson = prefs.getString("settings", null)
 
-      _properties.value = propsJson?.let { propertiesAdapter.fromJson(it) } ?: SeedData.INITIAL_PROPERTIES
-      _units.value = unitsJson?.let { unitsAdapter.fromJson(it) } ?: SeedData.INITIAL_UNITS
-      val loadedContracts = contractsJson?.let { contractsAdapter.fromJson(it) } ?: SeedData.INITIAL_CONTRACTS
-      _payments.value = paymentsJson?.let { paymentsAdapter.fromJson(it) } ?: SeedData.generateInitialPayments()
+      _properties.value = propsJson?.let { propertiesAdapter.fromJson(it) } ?: emptyList()
+      _units.value = unitsJson?.let { unitsAdapter.fromJson(it) } ?: emptyList()
+      val loadedContracts = contractsJson?.let { contractsAdapter.fromJson(it) } ?: emptyList()
+      _payments.value = paymentsJson?.let { paymentsAdapter.fromJson(it) } ?: emptyList()
       _settings.value = settingsJson?.let { settingsAdapter.fromJson(it) } ?: AppSettings(
         templates = ContractTemplates(
           apartments = DefaultTemplates.APARTMENT_TEMPLATE,
@@ -256,6 +254,28 @@ class RentRepository(private val context: Context) {
   fun updateUnit(unit: UnitItem) {
     val updated = _units.value.map { if (it.id == unit.id) unit else it }
     _units.value = updated
+    if (unit.monthlyRent != null && unit.monthlyRent > 0) {
+      val activeContract = _contracts.value.find { !it.isHistory && it.unitId == unit.id }
+      if (activeContract != null && activeContract.monthlyRent != unit.monthlyRent) {
+        val updatedContract = activeContract.copy(monthlyRent = unit.monthlyRent)
+        val updatedContracts = _contracts.value.map { if (it.id == updatedContract.id) updatedContract else it }
+        val updatedPayments = _payments.value.map { p ->
+          if (p.contractId == updatedContract.id && p.status != PaymentStatus.PAID) {
+            p.copy(
+              unitId = updatedContract.unitId,
+              amount = updatedContract.monthlyRent,
+              rentAmount = updatedContract.monthlyRent
+            )
+          } else {
+            p
+          }
+        }
+        _contracts.value = updatedContracts
+        _payments.value = updatedPayments
+        saveAll(uList = updated, cntList = updatedContracts, payList = updatedPayments)
+        return
+      }
+    }
     saveAll(uList = updated)
   }
 
@@ -299,9 +319,22 @@ class RentRepository(private val context: Context) {
   }
 
   fun updateContract(contract: Contract) {
-    val updated = _contracts.value.map { if (it.id == contract.id) contract else it }
-    _contracts.value = updated
-    saveAll(cntList = updated)
+    val updatedContracts = _contracts.value.map { if (it.id == contract.id) contract else it }
+    _contracts.value = updatedContracts
+
+    val updatedPayments = _payments.value.map { p ->
+      if (p.contractId == contract.id && p.status != PaymentStatus.PAID) {
+        p.copy(
+          unitId = contract.unitId,
+          amount = contract.monthlyRent,
+          rentAmount = contract.monthlyRent
+        )
+      } else {
+        p
+      }
+    }
+    _payments.value = updatedPayments
+    saveAll(cntList = updatedContracts, payList = updatedPayments)
   }
 
   fun endContract(contractId: String) {
@@ -420,6 +453,60 @@ class RentRepository(private val context: Context) {
     val updated = _payments.value.map { if (it.id == payment.id) payment else it }
     _payments.value = updated
     saveAll(payList = updated)
+  }
+
+  fun addPayment(payment: Payment) {
+    val updated = listOf(payment) + _payments.value
+    _payments.value = updated
+    saveAll(payList = updated)
+  }
+
+  fun deletePayment(paymentId: String) {
+    val updated = _payments.value.filter { it.id != paymentId }
+    _payments.value = updated
+    saveAll(payList = updated)
+  }
+
+  fun updateContractRentForUnit(unitId: String, newRent: Double) {
+    val updatedUnits = _units.value.map { if (it.id == unitId) it.copy(monthlyRent = newRent) else it }
+    _units.value = updatedUnits
+
+    val activeContract = _contracts.value.find { !it.isHistory && it.unitId == unitId }
+    if (activeContract != null) {
+      val updatedContract = activeContract.copy(monthlyRent = newRent)
+      val updatedContracts = _contracts.value.map { if (it.id == updatedContract.id) updatedContract else it }
+      val updatedPayments = _payments.value.map { p ->
+        if (p.contractId == updatedContract.id && p.status != PaymentStatus.PAID) {
+          p.copy(
+            unitId = updatedContract.unitId,
+            amount = updatedContract.monthlyRent,
+            rentAmount = updatedContract.monthlyRent
+          )
+        } else {
+          p
+        }
+      }
+      _contracts.value = updatedContracts
+      _payments.value = updatedPayments
+      saveAll(uList = updatedUnits, cntList = updatedContracts, payList = updatedPayments)
+    } else {
+      saveAll(uList = updatedUnits)
+    }
+  }
+
+  fun clearAllData() {
+    _properties.value = emptyList()
+    _units.value = emptyList()
+    _contracts.value = emptyList()
+    _payments.value = emptyList()
+    _tenants.value = emptyList()
+    saveAll(
+      props = emptyList(),
+      uList = emptyList(),
+      cntList = emptyList(),
+      payList = emptyList(),
+      tenantList = emptyList()
+    )
   }
 
   // --- Tenant CRUD ---

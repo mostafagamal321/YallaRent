@@ -254,19 +254,24 @@ class RentViewModel(application: Application) : AndroidViewModel(application) {
     repository.deleteProperty(propertyId)
   }
 
-  fun addUnit(propertyId: String, unitNumber: String, description: String, notes: String?) {
+  fun addUnit(propertyId: String, unitNumber: String, description: String, notes: String?, monthlyRent: Double? = null) {
     val newUnit = UnitItem(
       id = "unit-${System.currentTimeMillis()}",
       propertyId = propertyId,
       unitNumber = unitNumber,
       description = description,
-      notes = notes?.ifBlank { null }
+      notes = notes?.ifBlank { null },
+      monthlyRent = monthlyRent
     )
     repository.addUnit(newUnit)
   }
 
   fun updateUnit(unit: UnitItem) {
     repository.updateUnit(unit)
+  }
+
+  fun clearAllData() {
+    repository.clearAllData()
   }
 
   fun deleteUnit(unitId: String) {
@@ -320,6 +325,18 @@ class RentViewModel(application: Application) : AndroidViewModel(application) {
 
   fun updatePayment(payment: Payment) {
     repository.updatePayment(payment)
+  }
+
+  fun addPayment(payment: Payment) {
+    repository.addPayment(payment)
+  }
+
+  fun deletePayment(paymentId: String) {
+    repository.deletePayment(paymentId)
+  }
+
+  fun updateContractRentForUnit(unitId: String, newRent: Double) {
+    repository.updateContractRentForUnit(unitId, newRent)
   }
 
   fun addTenant(tenant: Tenant) {

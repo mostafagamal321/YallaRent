@@ -13,6 +13,7 @@ export interface Unit {
   unitNumber: string;
   description: string;
   notes?: string; // previous/expected tenant or owner note
+  targetRent?: number;
 }
 
 export interface Tenant {

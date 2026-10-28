@@ -385,18 +385,35 @@ export const TenantProfileModal: React.FC<TenantProfileModalProps> = ({
                 <span style={{ fontSize: '13px', fontWeight: 800, color: '#1b4332' }}>
                   {isAr ? 'العقد الحالي' : 'Current Contract'}
                 </span>
-                <span
-                  style={{
-                    padding: '3px 10px',
-                    borderRadius: '12px',
-                    fontSize: '11px',
-                    fontWeight: 800,
-                    backgroundColor: activeContract.status === 'active' ? '#dcfce7' : '#fef3c7',
-                    color: activeContract.status === 'active' ? '#166534' : '#92400e',
-                  }}
-                >
-                  {activeContract.status === 'active' ? (isAr ? 'ساري' : 'Active') : (isAr ? 'أوشك على الانتهاء' : 'Expiring')}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    onClick={() => onOpenContract && onOpenContract(activeContract)}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      backgroundColor: '#e0f2fe',
+                      color: '#0369a1',
+                      border: '1px solid #bae6fd',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isAr ? 'تعديل العقد' : 'Edit Contract'}
+                  </button>
+                  <span
+                    style={{
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      backgroundColor: activeContract.status === 'active' ? '#dcfce7' : '#fef3c7',
+                      color: activeContract.status === 'active' ? '#166534' : '#92400e',
+                    }}
+                  >
+                    {activeContract.status === 'active' ? (isAr ? 'ساري' : 'Active') : (isAr ? 'أوشك على الانتهاء' : 'Expiring')}
+                  </span>
+                </div>
               </div>
 
               <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -718,7 +735,7 @@ export const TenantProfileModal: React.FC<TenantProfileModalProps> = ({
                 }}
               >
                 <FileText size={16} />
-                <span>{isAr ? 'فتح العقد' : 'Open Contract'}</span>
+                <span>{isAr ? 'تعديل وتفاصيل العقد' : 'Edit / View Contract'}</span>
               </button>
             )}
           </div>

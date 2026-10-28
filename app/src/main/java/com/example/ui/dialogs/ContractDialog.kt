@@ -123,7 +123,13 @@ fun ContractDialog(
       }
     )
   }
-  var monthlyRent by remember { mutableStateOf(existingContract?.monthlyRent?.toInt()?.toString() ?: "3000") }
+  var monthlyRent by remember {
+    mutableStateOf(
+      existingContract?.monthlyRent?.toInt()?.toString()
+        ?: currentUnit?.monthlyRent?.toInt()?.toString()
+        ?: ""
+    )
+  }
   var rentDueDay by remember { mutableStateOf(existingContract?.rentDueDay?.toString() ?: "1") }
   var notes by remember { mutableStateOf(existingContract?.notes ?: "") }
 
@@ -140,7 +146,7 @@ fun ContractDialog(
   var electricity by remember { mutableStateOf(existingContract?.electricity ?: "على المستأجر") }
   var stairsLight by remember { mutableStateOf(existingContract?.stairsLight ?: "على المستأجر") }
   var doormanFee by remember { mutableStateOf(existingContract?.doormanFee ?: "لا يوجد") }
-  var depositAmount by remember { mutableStateOf(existingContract?.depositAmount?.toInt()?.toString() ?: "3000") }
+  var depositAmount by remember { mutableStateOf(existingContract?.depositAmount?.toInt()?.toString() ?: "") }
   var extraClause by remember { mutableStateOf(existingContract?.extraClause ?: "") }
 
   var unitDropdownExpanded by remember { mutableStateOf(false) }
@@ -236,8 +242,27 @@ fun ContractDialog(
               .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
           ) {
+            // Units Empty Warning
+            if (units.isEmpty()) {
+              item {
+                Surface(
+                  shape = RoundedCornerShape(10.dp),
+                  color = Color(0xFFFEF2F2),
+                  border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFECACA)),
+                  modifier = Modifier.fillMaxWidth()
+                ) {
+                  Text(
+                    text = if (isAr) "تنبيه: يجب إضافة عقار ووحدة واحدة على الأقل قبل تحرير العقد." else "Notice: Please add a property and at least one unit before creating a lease.",
+                    color = Color(0xFFDC2626),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(12.dp)
+                  )
+                }
+              }
+            }
+
             // Unit selection if new
-            if (existingContract == null) {
+            if (existingContract == null && units.isNotEmpty()) {
               item {
                 ExposedDropdownMenuBox(
                   expanded = unitDropdownExpanded,
@@ -245,7 +270,7 @@ fun ContractDialog(
                   modifier = Modifier.fillMaxWidth()
                 ) {
                   OutlinedTextField(
-                    value = "${currentProperty?.name ?: ""} - ${if (isAr) "وحدة ${currentUnit?.unitNumber}" else "Unit ${currentUnit?.unitNumber}"}",
+                    value = "${currentProperty?.name ?: ""} - ${if (isAr) "وحدة ${currentUnit?.unitNumber ?: ""}" else "Unit ${currentUnit?.unitNumber ?: ""}"}",
                     onValueChange = {},
                     readOnly = true,
                     label = { Text(if (isAr) "اختر الوحدة" else "Select Unit") },
@@ -261,7 +286,13 @@ fun ContractDialog(
                       val p = properties.find { it.id == u.propertyId }
                       DropdownMenuItem(
                         text = { Text("${p?.name ?: ""} - ${if (isAr) "وحدة ${u.unitNumber}" else "Unit ${u.unitNumber}"}") },
-                        onClick = { selectedUnitId = u.id; unitDropdownExpanded = false }
+                        onClick = {
+                          selectedUnitId = u.id
+                          if (monthlyRent.isBlank() && u.monthlyRent != null && u.monthlyRent > 0) {
+                            monthlyRent = u.monthlyRent.toInt().toString()
+                          }
+                          unitDropdownExpanded = false
+                        }
                       )
                     }
                   }

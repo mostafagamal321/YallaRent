@@ -96,6 +96,12 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   // Populate data when existingContract changes
   useEffect(() => {
     if (existingContract) {
+      if (existingContract.unitId) {
+        setSelectedUnitId(existingContract.unitId);
+      }
+      if (existingContract.tenantId) {
+        setSelectedTenantId(existingContract.tenantId);
+      }
       setTenantName(existingContract.tenantName);
       setNationalId(existingContract.nationalId || '');
       setStartDate(existingContract.startDate);
@@ -327,37 +333,37 @@ export const ContractModal: React.FC<ContractModalProps> = ({
         <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
           {currentStep === 'form' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Unit Selection if new */}
-              {!existingContract && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
-                    {isAr ? 'اختر الوحدة' : 'Select Unit'}
-                  </label>
-                  <select
-                    value={selectedUnitId}
-                    onChange={(e) => setSelectedUnitId(e.target.value)}
-                    style={{
-                      width: '100%',
-                      height: '44px',
-                      padding: '0 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '14px',
-                      backgroundColor: '#ffffff',
-                    }}
-                  >
-                    {units.map((u) => {
-                      const prop = properties.find((p) => p.id === u.propertyId);
-                      const hasContract = contracts.some((c) => !c.isHistory && c.unitId === u.id);
-                      return (
-                        <option key={u.id} value={u.id}>
-                          {prop?.name} - {isAr ? `وحدة ${u.unitNumber}` : `Unit ${u.unitNumber}`} {hasContract ? (isAr ? '(مؤجرة)' : '(Leased)') : (isAr ? '(شاغرة)' : '(Vacant)')}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
-              )}
+              {/* Unit Selection */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  {isAr ? 'العقار والوحدة المؤجرة' : 'Leased Property & Unit'}
+                </label>
+                <select
+                  value={selectedUnitId}
+                  onChange={(e) => setSelectedUnitId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    padding: '0 12px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #cbd5e1',
+                    fontSize: '14px',
+                    backgroundColor: '#ffffff',
+                    fontWeight: 600,
+                  }}
+                >
+                  {units.map((u) => {
+                    const prop = properties.find((p) => p.id === u.propertyId);
+                    const isCurrentUnit = existingContract && existingContract.unitId === u.id;
+                    const hasOtherContract = contracts.some((c) => !c.isHistory && c.unitId === u.id && c.id !== existingContract?.id);
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {prop?.name} - {isAr ? `وحدة ${u.unitNumber}` : `Unit ${u.unitNumber}`} {isCurrentUnit ? (isAr ? '(الوحدة الحالية للعقد)' : '(Current Contract Unit)') : hasOtherContract ? (isAr ? '(مؤجرة)' : '(Occupied)') : (isAr ? '(شاغرة)' : '(Vacant)')}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
 
               {/* Primary Contract Fields */}
               <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
@@ -752,22 +758,49 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 >
                   {isAr ? 'إلغاء' : 'Cancel'}
                 </button>
+
+                {existingContract && (
+                  <button
+                    type="button"
+                    onClick={handleCommitContract}
+                    style={{
+                      flex: 2,
+                      padding: '12px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: '#1b4332',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 6px rgba(27,67,50,0.3)',
+                    }}
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>{isAr ? 'حفظ التعديلات' : 'Save Changes'}</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handleSaveAndReview}
                   style={{
-                    flex: 2,
+                    flex: existingContract ? 1.5 : 2,
                     padding: '12px',
                     borderRadius: '10px',
-                    border: 'none',
-                    backgroundColor: '#1b4332',
-                    color: '#ffffff',
+                    border: existingContract ? '1.5px solid #1b4332' : 'none',
+                    backgroundColor: existingContract ? '#f0fdf4' : '#1b4332',
+                    color: existingContract ? '#1b4332' : '#ffffff',
                     fontWeight: 700,
                     fontSize: '14px',
                     cursor: 'pointer',
                   }}
                 >
-                  {isAr ? 'متابعة ومراجعة العقد' : 'Review Contract Details'}
+                  {isAr ? 'مراجعة وطباعة PDF' : 'Review & Print PDF'}
                 </button>
               </div>
             </div>

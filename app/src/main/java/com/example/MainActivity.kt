@@ -184,17 +184,27 @@ fun RentManagerApp(viewModel: RentViewModel) {
             contracts = contracts,
             searchQuery = searchQuery,
             language = settings.language,
+            tenants = tenants,
             onAddProperty = { name, type, address ->
               viewModel.addProperty(name, type, address)
             },
             onUpdateProperty = { prop ->
               viewModel.updateProperty(prop)
             },
-            onAddUnit = { propId, unitNum, desc, notes ->
-              viewModel.addUnit(propId, unitNum, desc, notes)
+            onDeleteProperty = { propId ->
+              viewModel.deleteProperty(propId)
+            },
+            onAddUnit = { propId, unitNum, desc, notes, rent ->
+              viewModel.addUnit(propId, unitNum, desc, notes, rent)
             },
             onUpdateUnit = { unit ->
               viewModel.updateUnit(unit)
+            },
+            onDeleteUnit = { unitId ->
+              viewModel.deleteUnit(unitId)
+            },
+            onUpdateContractRentForUnit = { unitId, newRent ->
+              viewModel.updateContractRentForUnit(unitId, newRent)
             },
             onOpenContractDialog = { unitId, contract ->
               contractDialogUnitId = unitId
@@ -203,6 +213,9 @@ fun RentManagerApp(viewModel: RentViewModel) {
             },
             onOpenUnitDetail = { unitId ->
               activeUnitDetailId = unitId
+            },
+            onOpenTenantProfile = { tenant ->
+              activeTenantProfile = tenant
             }
           )
         }
@@ -223,6 +236,12 @@ fun RentManagerApp(viewModel: RentViewModel) {
                 paidDate = Formatters.getTodayIso(),
                 note = null
               )
+            },
+            onAddPayment = { newPayment ->
+              viewModel.addPayment(newPayment)
+            },
+            onDeletePayment = { paymentId ->
+              viewModel.deletePayment(paymentId)
             }
           )
         }
@@ -250,6 +269,9 @@ fun RentManagerApp(viewModel: RentViewModel) {
             },
             onImportBackup = { json ->
               viewModel.importBackupJson(json)
+            },
+            onClearAllData = {
+              viewModel.clearAllData()
             }
           )
         }

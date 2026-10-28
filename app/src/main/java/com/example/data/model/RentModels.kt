@@ -34,7 +34,8 @@ data class UnitItem(
   val propertyId: String,
   val unitNumber: String,
   val description: String,
-  val notes: String? = null
+  val notes: String? = null,
+  val monthlyRent: Double? = null
 )
 
 @JsonClass(generateAdapter = true)
